@@ -1,0 +1,24 @@
+node_modules
+dist
+.DS_Store
+*.log
+src-tauri/target
+.vscode
+!inputExample/audit.log
+
+# OS / editors
+Thumbs.db
+.idea/
+*.swp
+
+# Build / cache
+.vite/
+*.tsbuildinfo
+
+# Local env / secrets (defensive)
+.env
+.env.*
+!.env.example
+
+# Claude Code session state (local-only)
+.claude/
