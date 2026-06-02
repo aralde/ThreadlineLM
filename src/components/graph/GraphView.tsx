@@ -13,6 +13,7 @@ import ReactFlow, {
 } from "reactflow";
 import dagre from "dagre";
 import {
+  Brain,
   ChevronDown,
   ChevronRight,
   Cog,
@@ -30,7 +31,13 @@ const NODE_W = 360;
 const COLLAPSED_H = 56;
 const EXPANDED_H = 220;
 
-type Kind = "system" | "user" | "assistant" | "tool_call" | "tool_result";
+type Kind =
+  | "system"
+  | "user"
+  | "assistant"
+  | "thinking"
+  | "tool_call"
+  | "tool_result";
 
 interface CardData {
   kind: Kind;
@@ -52,6 +59,8 @@ function colors(kind: Kind) {
       return { border: "border-sky-700", bg: "bg-sky-950/80", text: "text-sky-100", accent: "text-sky-400", handle: "#0369a1" };
     case "assistant":
       return { border: "border-emerald-700", bg: "bg-emerald-950/80", text: "text-emerald-100", accent: "text-emerald-400", handle: "#047857" };
+    case "thinking":
+      return { border: "border-fuchsia-800/60", bg: "bg-fuchsia-950/40", text: "text-fuchsia-100/90", accent: "text-fuchsia-400", handle: "#a21caf" };
     case "tool_call":
       return { border: "border-violet-700", bg: "bg-violet-950/80", text: "text-violet-100", accent: "text-violet-400", handle: "#6d28d9" };
     case "tool_result":
@@ -67,6 +76,8 @@ function Icon({ kind, size = 13 }: { kind: Kind; size?: number }) {
       return <User size={size} />;
     case "assistant":
       return <Sparkles size={size} />;
+    case "thinking":
+      return <Brain size={size} />;
     case "tool_call":
       return <Wrench size={size} />;
     case "tool_result":
@@ -160,12 +171,26 @@ function expandTurns(
   conv.forEach((t, convIdx) => {
     const bubbleId = convIdx === respIndex ? "resp" : `msg:${convIdx}`;
 
+    // Reasoning (chain-of-thought / thinking summary) — emitted as its own
+    // node ahead of the assistant content/tool_calls when present.
+    if (t.role === "assistant" && t.reasoning && t.reasoning.trim().length > 0) {
+      out.push({
+        index: i++,
+        kind: "thinking",
+        title: "THINKING",
+        preview: previewOf(t.reasoning),
+        body: t.reasoning,
+        eventId: t.event_id,
+        focusTarget: bubbleId,
+      });
+    }
+
     if (t.role === "assistant" && t.tool_calls && t.tool_calls.length > 0) {
       if (t.content && t.content.trim().length > 0) {
         out.push({
           index: i++,
           kind: "assistant",
-          title: "ASSISTANT · thinking",
+          title: "ASSISTANT",
           preview: previewOf(t.content),
           body: t.content,
           eventId: t.event_id,
@@ -379,7 +404,12 @@ export default function GraphView() {
   const defaultCollapsed = useMemo(() => {
     const set = new Set<number>();
     for (const t of turns) {
-      if (t.kind === "tool_call" || t.kind === "tool_result" || t.kind === "system") {
+      if (
+        t.kind === "tool_call" ||
+        t.kind === "tool_result" ||
+        t.kind === "system" ||
+        t.kind === "thinking"
+      ) {
         set.add(t.index);
       }
     }

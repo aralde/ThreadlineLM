@@ -25,6 +25,8 @@ export interface ChatMessage {
   name?: string | null;
   tool_call_id?: string | null;
   tool_calls?: ToolCall[];
+  /** Provider chain-of-thought / reasoning summary, when exposed. */
+  reasoning?: string | null;
 }
 
 export interface ToolCall {
@@ -80,6 +82,7 @@ export interface ConversationTurn {
   role: string;
   content: string;
   tool_calls?: ToolCall[];
+  reasoning?: string | null;
 }
 
 export interface Session {

@@ -109,6 +109,12 @@ pub struct ChatMessage {
     pub tool_call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
+    /// Provider-specific chain-of-thought / reasoning summary. Sources include
+    /// Groq/OpenRouter `reasoning`, DeepSeek/xAI/NIM `reasoning_content`,
+    /// Anthropic `thinking` content blocks, Gemini `parts[].thought` text,
+    /// OpenAI Responses `output[].summary[].text`, and inline `<think>...</think>`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -165,6 +171,8 @@ pub struct ConversationTurn {
     pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

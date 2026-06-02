@@ -39,6 +39,16 @@ function MessageBubble({
         {m.role}
         {m.name ? ` · ${m.name}` : ""}
       </div>
+      {m.reasoning && (
+        <details className="mb-2 text-xs">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-wider text-fuchsia-400/80 hover:text-fuchsia-300">
+            thinking
+          </summary>
+          <div className="mt-1 whitespace-pre-wrap text-fuchsia-100/80 font-mono border-l-2 border-fuchsia-700/50 pl-2">
+            {m.reasoning}
+          </div>
+        </details>
+      )}
       {m.content && (
         <div className="text-xs whitespace-pre-wrap text-zinc-200 font-mono">
           {m.content}

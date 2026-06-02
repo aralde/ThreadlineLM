@@ -99,6 +99,7 @@ fn reconstruct(events: &[LogEvent], event_ids: &[String]) -> Vec<ConversationTur
                 role: m.role.clone(),
                 content: m.content.clone().unwrap_or_default(),
                 tool_calls: m.tool_calls.clone(),
+                reasoning: m.reasoning.clone(),
             });
         }
         // Append the final assistant from the winning event (not present in its
@@ -110,6 +111,7 @@ fn reconstruct(events: &[LogEvent], event_ids: &[String]) -> Vec<ConversationTur
                     role: a.role.clone(),
                     content: a.content.clone().unwrap_or_default(),
                     tool_calls: a.tool_calls.clone(),
+                    reasoning: a.reasoning.clone(),
                 });
             }
         }
@@ -123,6 +125,7 @@ fn reconstruct(events: &[LogEvent], event_ids: &[String]) -> Vec<ConversationTur
                         role: a.role.clone(),
                         content: a.content.clone().unwrap_or_default(),
                         tool_calls: a.tool_calls.clone(),
+                        reasoning: a.reasoning.clone(),
                     });
                 }
             }
