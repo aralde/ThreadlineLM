@@ -41,6 +41,7 @@ pub fn extract_sse_text(body_val: &Value) -> Option<String> {
 pub fn assemble_openai_stream(raw: &str) -> AssembledStream {
     let mut role = String::from("assistant");
     let mut content = String::new();
+    let mut reasoning = String::new();
     let mut tool_calls: BTreeMap<u64, ToolCallBuilder> = BTreeMap::new();
     let mut finish_reason: Option<String> = None;
     let mut usage = Usage::default();
@@ -94,6 +95,14 @@ pub fn assemble_openai_stream(raw: &str) -> AssembledStream {
         if let Some(c) = delta.get("content").and_then(|v| v.as_str()) {
             content.push_str(c);
         }
+        // Groq / OpenRouter expose reasoning deltas as `delta.reasoning`;
+        // DeepSeek / xAI / NIM use `delta.reasoning_content`.
+        if let Some(r) = delta.get("reasoning").and_then(|v| v.as_str()) {
+            reasoning.push_str(r);
+        }
+        if let Some(r) = delta.get("reasoning_content").and_then(|v| v.as_str()) {
+            reasoning.push_str(r);
+        }
         if let Some(tcs) = delta.get("tool_calls").and_then(|v| v.as_array()) {
             for tc in tcs {
                 let idx = tc.get("index").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -128,11 +137,33 @@ pub fn assemble_openai_stream(raw: &str) -> AssembledStream {
 
     let has_content = !content.is_empty();
     let has_tools = !tool_calls_vec.is_empty();
-    let assistant = if has_content || has_tools {
+    let has_reasoning = !reasoning.is_empty();
+    let assistant = if has_content || has_tools || has_reasoning {
+        // Inline `<think>...</think>` may still appear in the assembled content
+        // for local models that emit it as plain text rather than a dedicated
+        // delta field. Move it into reasoning.
+        let (visible, extra_thought) = super::openai_audit::split_think_tags_public(&content);
+        let final_content = if has_content { visible } else { String::new() };
+        let mut final_reasoning = reasoning;
+        if !extra_thought.is_empty() {
+            if !final_reasoning.is_empty() {
+                final_reasoning.push_str("\n\n");
+            }
+            final_reasoning.push_str(&extra_thought);
+        }
         Some(ChatMessage {
             role,
-            content: if has_content { Some(content) } else { None },
+            content: if final_content.is_empty() {
+                None
+            } else {
+                Some(final_content)
+            },
             tool_calls: if has_tools { Some(tool_calls_vec) } else { None },
+            reasoning: if final_reasoning.is_empty() {
+                None
+            } else {
+                Some(final_reasoning)
+            },
             ..Default::default()
         })
     } else {

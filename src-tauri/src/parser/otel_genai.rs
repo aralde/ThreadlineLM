@@ -247,6 +247,10 @@ fn message_from_event(role: &str, attrs: &AttrMap) -> ChatMessage {
     let content = attrs.get_str("content");
     let tool_call_id = attrs.get_str("id").filter(|_| role == "tool");
     let name = attrs.get_str("name");
+    let reasoning = attrs
+        .get_str("reasoning")
+        .or_else(|| attrs.get_str("reasoning_content"))
+        .or_else(|| attrs.get_str("thinking"));
 
     // `tool_calls` may be a JSON-encoded string OR an inline JSON array.
     let tool_calls = attrs.get_value("tool_calls").and_then(|v| {
@@ -287,6 +291,7 @@ fn message_from_event(role: &str, attrs: &AttrMap) -> ChatMessage {
         name,
         tool_call_id,
         tool_calls,
+        reasoning,
     }
 }
 

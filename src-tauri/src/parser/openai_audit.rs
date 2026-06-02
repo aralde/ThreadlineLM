@@ -203,6 +203,7 @@ pub(crate) fn parse_response(body: Option<&Value>) -> ResponsePayload {
     // Anthropic-shape: content array
     if let Some(content) = body_val.get("content").and_then(|v| v.as_array()) {
         let mut text = String::new();
+        let mut reasoning_parts: Vec<String> = Vec::new();
         let mut tool_calls: Vec<ToolCall> = Vec::new();
         for item in content {
             match item.get("type").and_then(|v| v.as_str()) {
@@ -210,6 +211,14 @@ pub(crate) fn parse_response(body: Option<&Value>) -> ResponsePayload {
                     if let Some(t) = item.get("text").and_then(|v| v.as_str()) {
                         text.push_str(t);
                     }
+                }
+                Some("thinking") => {
+                    if let Some(t) = item.get("thinking").and_then(|v| v.as_str()) {
+                        reasoning_parts.push(t.to_string());
+                    }
+                }
+                Some("redacted_thinking") => {
+                    reasoning_parts.push("[redacted]".to_string());
                 }
                 Some("tool_use") => tool_calls.push(ToolCall {
                     id: item
@@ -242,6 +251,11 @@ pub(crate) fn parse_response(body: Option<&Value>) -> ResponsePayload {
             } else {
                 Some(tool_calls)
             },
+            reasoning: if reasoning_parts.is_empty() {
+                None
+            } else {
+                Some(reasoning_parts.join("\n\n"))
+            },
             ..Default::default()
         });
         return ResponsePayload {
@@ -249,6 +263,152 @@ pub(crate) fn parse_response(body: Option<&Value>) -> ResponsePayload {
             finish_reason,
             usage,
         };
+    }
+
+    // OpenAI Responses API: `output` is an array of items keyed by `type`.
+    // `reasoning` items carry a `summary[].text`; `message` items wrap a
+    // `content[].text` payload.
+    if let Some(output) = body_val.get("output").and_then(|v| v.as_array()) {
+        let mut text = String::new();
+        let mut reasoning_parts: Vec<String> = Vec::new();
+        let mut tool_calls: Vec<ToolCall> = Vec::new();
+        for item in output {
+            match item.get("type").and_then(|v| v.as_str()) {
+                Some("reasoning") => {
+                    if let Some(arr) = item.get("summary").and_then(|v| v.as_array()) {
+                        for s in arr {
+                            if let Some(t) = s.get("text").and_then(|v| v.as_str()) {
+                                reasoning_parts.push(t.to_string());
+                            }
+                        }
+                    }
+                }
+                Some("message") => {
+                    if let Some(arr) = item.get("content").and_then(|v| v.as_array()) {
+                        for c in arr {
+                            if let Some(t) = c.get("text").and_then(|v| v.as_str()) {
+                                text.push_str(t);
+                            }
+                        }
+                    }
+                }
+                Some("function_call") => tool_calls.push(ToolCall {
+                    id: item
+                        .get("call_id")
+                        .or_else(|| item.get("id"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    name: item
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    arguments: item
+                        .get("arguments")
+                        .map(|v| match v {
+                            Value::String(s) => s.clone(),
+                            other => other.to_string(),
+                        })
+                        .unwrap_or_default(),
+                }),
+                _ => {}
+            }
+        }
+        if !text.is_empty() || !reasoning_parts.is_empty() || !tool_calls.is_empty() {
+            let assistant = Some(ChatMessage {
+                role: "assistant".into(),
+                content: if text.is_empty() { None } else { Some(text) },
+                tool_calls: if tool_calls.is_empty() {
+                    None
+                } else {
+                    Some(tool_calls)
+                },
+                reasoning: if reasoning_parts.is_empty() {
+                    None
+                } else {
+                    Some(reasoning_parts.join("\n\n"))
+                },
+                ..Default::default()
+            });
+            let finish_reason = body_val
+                .get("status")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            return ResponsePayload {
+                assistant,
+                finish_reason,
+                usage,
+            };
+        }
+    }
+
+    // Gemini native shape: `candidates[0].content.parts[]` with `thought:true`
+    // marking reasoning parts.
+    if let Some(candidates) = body_val.get("candidates").and_then(|v| v.as_array()) {
+        if let Some(first) = candidates.first() {
+            let mut text = String::new();
+            let mut reasoning_parts: Vec<String> = Vec::new();
+            let mut tool_calls: Vec<ToolCall> = Vec::new();
+            if let Some(parts) = first
+                .get("content")
+                .and_then(|c| c.get("parts"))
+                .and_then(|p| p.as_array())
+            {
+                for part in parts {
+                    let is_thought = part
+                        .get("thought")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if let Some(t) = part.get("text").and_then(|v| v.as_str()) {
+                        if is_thought {
+                            reasoning_parts.push(t.to_string());
+                        } else {
+                            text.push_str(t);
+                        }
+                    } else if let Some(fc) = part.get("functionCall") {
+                        tool_calls.push(ToolCall {
+                            id: String::new(),
+                            name: fc
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            arguments: fc
+                                .get("args")
+                                .map(|v| v.to_string())
+                                .unwrap_or_default(),
+                        });
+                    }
+                }
+            }
+            if !text.is_empty() || !reasoning_parts.is_empty() || !tool_calls.is_empty() {
+                let assistant = Some(ChatMessage {
+                    role: "assistant".into(),
+                    content: if text.is_empty() { None } else { Some(text) },
+                    tool_calls: if tool_calls.is_empty() {
+                        None
+                    } else {
+                        Some(tool_calls)
+                    },
+                    reasoning: if reasoning_parts.is_empty() {
+                        None
+                    } else {
+                        Some(reasoning_parts.join("\n\n"))
+                    },
+                    ..Default::default()
+                });
+                let finish_reason = first
+                    .get("finishReason")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                return ResponsePayload {
+                    assistant,
+                    finish_reason,
+                    usage,
+                };
+            }
+        }
     }
 
     ResponsePayload {
@@ -265,16 +425,34 @@ pub(crate) fn parse_message(v: &Value) -> ChatMessage {
         .unwrap_or("user")
         .to_string();
 
+    // Reasoning collected from sibling fields and (for Anthropic-shape content
+    // arrays) from `thinking` blocks. Multiple sources concatenate.
+    let mut reasoning_parts: Vec<String> = Vec::new();
+
     let content = match v.get("content") {
         Some(Value::String(s)) => Some(s.clone()),
         Some(Value::Array(arr)) => {
-            // Anthropic / multimodal: collect text parts
+            // Anthropic / multimodal: collect text parts; route `thinking` /
+            // `redacted_thinking` blocks to reasoning instead of visible text.
             let mut s = String::new();
             for part in arr {
-                if let Some(t) = part.get("text").and_then(|x| x.as_str()) {
-                    s.push_str(t);
-                } else if let Some(t) = part.as_str() {
-                    s.push_str(t);
+                let ty = part.get("type").and_then(|x| x.as_str());
+                match ty {
+                    Some("thinking") => {
+                        if let Some(t) = part.get("thinking").and_then(|x| x.as_str()) {
+                            reasoning_parts.push(t.to_string());
+                        }
+                    }
+                    Some("redacted_thinking") => {
+                        reasoning_parts.push("[redacted]".to_string());
+                    }
+                    _ => {
+                        if let Some(t) = part.get("text").and_then(|x| x.as_str()) {
+                            s.push_str(t);
+                        } else if let Some(t) = part.as_str() {
+                            s.push_str(t);
+                        }
+                    }
                 }
             }
             if s.is_empty() {
@@ -284,6 +462,34 @@ pub(crate) fn parse_message(v: &Value) -> ChatMessage {
             }
         }
         _ => None,
+    };
+
+    // Sibling fields used by Groq, OpenRouter, DeepSeek, xAI, NVIDIA NIM, Mistral magistral.
+    if let Some(r) = v.get("reasoning").and_then(|x| x.as_str()) {
+        if !r.is_empty() {
+            reasoning_parts.push(r.to_string());
+        }
+    }
+    if let Some(r) = v.get("reasoning_content").and_then(|x| x.as_str()) {
+        if !r.is_empty() {
+            reasoning_parts.push(r.to_string());
+        }
+    }
+
+    // Inline `<think>...</think>` (common in local models). Strip from visible
+    // content and append to reasoning.
+    let content = content.map(|c| {
+        let (visible, thought) = split_think_tags(&c);
+        if !thought.is_empty() {
+            reasoning_parts.push(thought);
+        }
+        visible
+    });
+
+    let reasoning = if reasoning_parts.is_empty() {
+        None
+    } else {
+        Some(reasoning_parts.join("\n\n"))
     };
 
     let name = v
@@ -350,7 +556,59 @@ pub(crate) fn parse_message(v: &Value) -> ChatMessage {
         name,
         tool_call_id,
         tool_calls,
+        reasoning,
     }
+}
+
+/// Extract `<think>...</think>` blocks (case-insensitive, byte-indexed so it
+/// is UTF-8 safe). Returns `(visible, thought)` where `visible` has the tags
+/// removed and `thought` is the concatenation of blocks joined by blank lines.
+pub(crate) fn split_think_tags_public(s: &str) -> (String, String) {
+    split_think_tags(s)
+}
+
+fn split_think_tags(s: &str) -> (String, String) {
+    let lower = s.to_ascii_lowercase();
+    if !lower.contains("<think>") {
+        return (s.to_string(), String::new());
+    }
+    const OPEN: &str = "<think>";
+    const CLOSE: &str = "</think>";
+
+    let mut visible = String::with_capacity(s.len());
+    let mut thoughts: Vec<String> = Vec::new();
+    let mut cursor = 0usize;
+    while cursor < s.len() {
+        match lower[cursor..].find(OPEN) {
+            Some(rel_open) => {
+                let abs_open = cursor + rel_open;
+                visible.push_str(&s[cursor..abs_open]);
+                let after_open = abs_open + OPEN.len();
+                match lower[after_open..].find(CLOSE) {
+                    Some(rel_close) => {
+                        let abs_close = after_open + rel_close;
+                        let inner = s[after_open..abs_close].trim();
+                        if !inner.is_empty() {
+                            thoughts.push(inner.to_string());
+                        }
+                        cursor = abs_close + CLOSE.len();
+                    }
+                    None => {
+                        let inner = s[after_open..].trim();
+                        if !inner.is_empty() {
+                            thoughts.push(inner.to_string());
+                        }
+                        cursor = s.len();
+                    }
+                }
+            }
+            None => {
+                visible.push_str(&s[cursor..]);
+                break;
+            }
+        }
+    }
+    (visible.trim().to_string(), thoughts.join("\n\n"))
 }
 
 #[cfg(test)]
@@ -402,6 +660,138 @@ mod tests {
         assert_eq!(assistant.content.as_deref(), Some("Hello world"));
         assert_eq!(resp.finish_reason.as_deref(), Some("stop"));
         assert_eq!(resp.usage.completion_tokens, Some(2));
+    }
+
+    #[test]
+    fn extracts_reasoning_field_groq_openrouter() {
+        let body = serde_json::json!({
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": "42",
+                    "reasoning": "Compute 6 * 7 = 42."
+                },
+                "finish_reason": "stop"
+            }]
+        });
+        let resp = parse_response(Some(&body));
+        let a = resp.assistant.unwrap();
+        assert_eq!(a.content.as_deref(), Some("42"));
+        assert_eq!(a.reasoning.as_deref(), Some("Compute 6 * 7 = 42."));
+    }
+
+    #[test]
+    fn extracts_reasoning_content_deepseek_xai() {
+        let body = serde_json::json!({
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": "ok",
+                    "reasoning_content": "First I think, then I answer."
+                }
+            }]
+        });
+        let a = parse_response(Some(&body)).assistant.unwrap();
+        assert_eq!(a.reasoning.as_deref(), Some("First I think, then I answer."));
+    }
+
+    #[test]
+    fn extracts_anthropic_thinking_block() {
+        let body = serde_json::json!({
+            "content": [
+                { "type": "thinking", "thinking": "Let me reason step by step." },
+                { "type": "text", "text": "Hi!" }
+            ],
+            "stop_reason": "end_turn"
+        });
+        let resp = parse_response(Some(&body));
+        let a = resp.assistant.unwrap();
+        assert_eq!(a.content.as_deref(), Some("Hi!"));
+        assert_eq!(a.reasoning.as_deref(), Some("Let me reason step by step."));
+    }
+
+    #[test]
+    fn extracts_openai_responses_reasoning_summary() {
+        let body = serde_json::json!({
+            "output": [
+                { "type": "reasoning",
+                  "summary": [
+                      { "type": "summary_text", "text": "Analyzed the prompt." },
+                      { "type": "summary_text", "text": "Picked an approach." }
+                  ] },
+                { "type": "message",
+                  "content": [ { "type": "output_text", "text": "Final answer." } ] }
+            ],
+            "status": "completed"
+        });
+        let a = parse_response(Some(&body)).assistant.unwrap();
+        assert_eq!(a.content.as_deref(), Some("Final answer."));
+        assert_eq!(
+            a.reasoning.as_deref(),
+            Some("Analyzed the prompt.\n\nPicked an approach.")
+        );
+    }
+
+    #[test]
+    fn extracts_gemini_thought_part() {
+        let body = serde_json::json!({
+            "candidates": [{
+                "content": {
+                    "parts": [
+                        { "thought": true, "text": "I should add 2+2." },
+                        { "text": "4" }
+                    ]
+                },
+                "finishReason": "STOP"
+            }]
+        });
+        let a = parse_response(Some(&body)).assistant.unwrap();
+        assert_eq!(a.content.as_deref(), Some("4"));
+        assert_eq!(a.reasoning.as_deref(), Some("I should add 2+2."));
+    }
+
+    #[test]
+    fn strips_think_tags_into_reasoning() {
+        let body = serde_json::json!({
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": "<think>plan carefully</think>The answer is 7."
+                }
+            }]
+        });
+        let a = parse_response(Some(&body)).assistant.unwrap();
+        assert_eq!(a.content.as_deref(), Some("The answer is 7."));
+        assert_eq!(a.reasoning.as_deref(), Some("plan carefully"));
+    }
+
+    #[test]
+    fn split_think_tags_is_utf8_safe() {
+        let (visible, thought) = split_think_tags("<think>razoná en español</think>ñandú");
+        assert_eq!(visible, "ñandú");
+        assert_eq!(thought, "razoná en español");
+    }
+
+    #[test]
+    fn assembles_streamed_reasoning_delta() {
+        let sse = "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"reasoning\":\"think \"},\"finish_reason\":null}]}\n\n\
+                   data: {\"choices\":[{\"delta\":{\"reasoning\":\"more.\"},\"finish_reason\":null}]}\n\n\
+                   data: {\"choices\":[{\"delta\":{\"content\":\"done\"},\"finish_reason\":\"stop\"}]}\n\n\
+                   data: [DONE]\n\n";
+        let record = serde_json::json!({
+            "id": "r1",
+            "ts": "2026-05-15T00:00:00Z",
+            "client": "127.0.0.1",
+            "model": "groq/qwen-reasoning",
+            "status": 200,
+            "duration_ms": 50,
+            "req_body": { "model": "qwen", "stream": true, "messages": [] },
+            "resp_body": { "data": sse, "size": sse.len(), "truncated": false }
+        });
+        let out = parse_jsonl(&serde_json::to_string(&record).unwrap());
+        let a = out.events[0].response.assistant.as_ref().unwrap();
+        assert_eq!(a.content.as_deref(), Some("done"));
+        assert_eq!(a.reasoning.as_deref(), Some("think more."));
     }
 
     #[test]
