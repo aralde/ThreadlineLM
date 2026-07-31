@@ -1,8 +1,34 @@
 import { create } from "zustand";
 import type { LogEvent, Session, SourceFile, Workspace } from "../types";
+import { ipc } from "../ipc";
 
-type View = "timeline" | "detail" | "graph" | "compare" | "metrics";
+type View = "timeline" | "detail" | "graph" | "compare" | "metrics" | "recents";
 export type Theme = "dark" | "light";
+
+export interface RecentFile {
+  path: string;
+  name: string;
+  timestamp: number;
+  watched: boolean;
+}
+
+const RECENTS_KEY = "threadlinelm:recent-files";
+
+function loadRecentFiles(): RecentFile[] {
+  if (typeof window === "undefined") return [];
+  const stored = window.localStorage.getItem(RECENTS_KEY);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveRecentFiles(files: RecentFile[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(RECENTS_KEY, JSON.stringify(files));
+}
 
 const THEME_KEY = "threadlinelm:theme";
 
@@ -46,6 +72,15 @@ interface AppState {
   focusInDetail: (eventId: string, target: string) => void;
   clearFocus: () => void;
   reset: () => void;
+  watchedFilePath: string | null;
+  startWatch: (path: string) => Promise<void>;
+  stopWatch: () => Promise<void>;
+  updateWatchedWorkspace: (ws: Workspace, warnings: string[]) => void;
+  recentFiles: RecentFile[];
+  addRecentFile: (path: string, watched: boolean) => void;
+  removeRecentFile: (path: string) => void;
+  clearRecentFiles: () => void;
+  loadFile: (path: string) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -59,6 +94,7 @@ export const useStore = create<AppState>((set, get) => ({
   search: "",
   compareIds: [null, null],
   focusKey: null,
+  watchedFilePath: null,
   theme: (() => {
     const t = loadTheme();
     applyTheme(t);
@@ -109,7 +145,102 @@ export const useStore = create<AppState>((set, get) => ({
     else if (!b) set({ compareIds: [a, id] });
     else set({ compareIds: [id, a] });
   },
-  reset: () =>
+  recentFiles: loadRecentFiles(),
+  addRecentFile: (path, watched) => {
+    const name = path.split(/[\\/]/).pop() || path;
+    const recent: RecentFile = {
+      path,
+      name,
+      timestamp: Date.now(),
+      watched,
+    };
+    const current = get().recentFiles.filter((f) => f.path !== path);
+    const next = [recent, ...current].slice(0, 15);
+    saveRecentFiles(next);
+    set({ recentFiles: next });
+  },
+  removeRecentFile: (path) => {
+    const next = get().recentFiles.filter((f) => f.path !== path);
+    saveRecentFiles(next);
+    set({ recentFiles: next });
+  },
+  clearRecentFiles: () => {
+    saveRecentFiles([]);
+    set({ recentFiles: [] });
+  },
+  loadFile: async (path) => {
+    const curPath = get().watchedFilePath;
+    if (curPath) {
+      try {
+        await ipc.stopWatch();
+      } catch (e) {
+        console.error("error stopping watch on loadFile", e);
+      }
+    }
+    const res = await ipc.loadFile(path);
+    set({
+      watchedFilePath: null,
+      files: res.workspace.files,
+      events: res.workspace.events,
+      sessions: res.workspace.sessions,
+      warnings: res.warnings,
+      selectedEventId: res.workspace.events[0]?.id ?? null,
+      selectedSessionId: res.workspace.sessions[0]?.id ?? null,
+    });
+    get().addRecentFile(path, false);
+  },
+  startWatch: async (path) => {
+    const curPath = get().watchedFilePath;
+    if (curPath) {
+      try {
+        await ipc.stopWatch();
+      } catch (e) {
+        console.error("error stopping watch", e);
+      }
+    }
+    const res = await ipc.startWatch(path);
+    set({
+      watchedFilePath: path,
+      files: res.workspace.files,
+      events: res.workspace.events,
+      sessions: res.workspace.sessions,
+      warnings: res.warnings,
+      selectedEventId: res.workspace.events[0]?.id ?? null,
+      selectedSessionId: res.workspace.sessions[0]?.id ?? null,
+    });
+    get().addRecentFile(path, true);
+  },
+  stopWatch: async () => {
+    try {
+      await ipc.stopWatch();
+    } catch (e) {
+      console.error("error stopping watch", e);
+    }
+    set({ watchedFilePath: null });
+  },
+  updateWatchedWorkspace: (ws, warnings) => {
+    const { selectedEventId, selectedSessionId } = get();
+    const nextEventId = ws.events.some((e) => e.id === selectedEventId)
+      ? selectedEventId
+      : (ws.events[0]?.id ?? null);
+    const nextSessionId = ws.sessions.some((s) => s.id === selectedSessionId)
+      ? selectedSessionId
+      : (ws.sessions[0]?.id ?? null);
+
+    set({
+      files: ws.files,
+      events: ws.events,
+      sessions: ws.sessions,
+      warnings,
+      selectedEventId: nextEventId,
+      selectedSessionId: nextSessionId,
+    });
+  },
+  reset: () => {
+    const watched = get().watchedFilePath;
+    if (watched) {
+      ipc.stopWatch().catch((e) => console.error("error stopping watch on reset", e));
+    }
     set({
       files: [],
       events: [],
@@ -118,5 +249,7 @@ export const useStore = create<AppState>((set, get) => ({
       selectedEventId: null,
       selectedSessionId: null,
       compareIds: [null, null],
-    }),
+      watchedFilePath: null,
+    });
+  },
 }));

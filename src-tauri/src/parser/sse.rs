@@ -18,13 +18,14 @@ pub struct AssembledStream {
 pub fn extract_sse_text(body_val: &Value) -> Option<String> {
     if let Some(s) = body_val.as_str() {
         let t = s.trim_start();
-        if t.starts_with("data:") {
+        if t.starts_with("data:") || t.contains("\ndata:") || t.contains("\r\ndata:") {
             return Some(s.to_string());
         }
         return None;
     }
     let data = body_val.get("data")?.as_str()?;
-    if data.trim_start().starts_with("data:") {
+    let t = data.trim_start();
+    if t.starts_with("data:") || t.contains("\ndata:") || t.contains("\r\ndata:") {
         Some(data.to_string())
     } else {
         None
@@ -201,6 +202,14 @@ mod tests {
     #[test]
     fn detects_sse_in_raw_string() {
         let v = Value::String("data: {\"choices\":[]}\n\ndata: [DONE]".into());
+        assert!(extract_sse_text(&v).is_some());
+    }
+
+    #[test]
+    fn detects_sse_with_leading_comments() {
+        let v: Value = serde_json::json!({
+            "data": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"choices\":[]}\n\n"
+        });
         assert!(extract_sse_text(&v).is_some());
     }
 

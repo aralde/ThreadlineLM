@@ -1,11 +1,11 @@
 [package]
 name = "threadlinelm"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Offline forensic viewer for LLM agent traces (Tauri backend)."
 license = "MIT"
-repository = "https://github.com/adeibe/ThreadlineLM"
-homepage = "https://github.com/adeibe/ThreadlineLM"
+repository = "https://github.com/aralde/ThreadlineLM"
+homepage = "https://github.com/aralde/ThreadlineLM"
 authors = ["aralde <80920987+aralde@users.noreply.github.com>"]
 readme = "../README.md"
 
