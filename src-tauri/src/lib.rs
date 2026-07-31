@@ -18,6 +18,8 @@ pub fn run() {
             commands::load_text,
             commands::export_session_markdown,
             commands::export_workspace_json,
+            commands::start_watch,
+            commands::stop_watch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ThreadlineLM");

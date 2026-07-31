@@ -8,11 +8,26 @@ import Detail from "./components/Detail";
 import GraphView from "./components/graph/GraphView";
 import Compare from "./components/Compare";
 import Metrics from "./components/Metrics";
+import { listen } from "@tauri-apps/api/event";
+import RecentFilesView from "./components/RecentFilesView";
 
 export default function App() {
   const events = useStore((s) => s.events);
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
+  const updateWatchedWorkspace = useStore((s) => s.updateWatchedWorkspace);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<any>("file-watch-update", (event) => {
+      updateWatchedWorkspace(event.payload.workspace, event.payload.warnings);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [updateWatchedWorkspace]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -54,6 +69,7 @@ export default function App() {
           {view === "graph" && <GraphView />}
           {view === "compare" && <Compare />}
           {view === "metrics" && <Metrics />}
+          {view === "recents" && <RecentFilesView />}
         </main>
       </div>
     </div>

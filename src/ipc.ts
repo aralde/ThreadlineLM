@@ -8,4 +8,6 @@ export const ipc = {
   exportSessionMarkdown: (sessionId: string) =>
     invoke<string>("export_session_markdown", { sessionId }),
   exportWorkspaceJson: () => invoke<string>("export_workspace_json"),
+  startWatch: (path: string) => invoke<LoadResult>("start_watch", { path }),
+  stopWatch: () => invoke<void>("stop_watch"),
 };
