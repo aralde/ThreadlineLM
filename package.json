@@ -1,16 +1,16 @@
 {
   "name": "threadlinelm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Offline forensic viewer for LLM agent traces — OpenTelemetry GenAI, OpenAI-compatible and LiteLLM audit logs.",
   "license": "MIT",
   "author": "aralde <80920987+aralde@users.noreply.github.com>",
-  "homepage": "https://github.com/adeibe/ThreadlineLM#readme",
+  "homepage": "https://github.com/aralde/ThreadlineLM#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/adeibe/ThreadlineLM.git"
+    "url": "git+https://github.com/aralde/ThreadlineLM.git"
   },
   "bugs": {
-    "url": "https://github.com/adeibe/ThreadlineLM/issues"
+    "url": "https://github.com/aralde/ThreadlineLM/issues"
   },
   "keywords": [
     "tauri",

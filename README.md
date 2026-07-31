@@ -8,7 +8,22 @@ Offline forensic viewer for LLM calls. Drop a `.log` / `.jsonl` file on the wind
 - **Privacy**: 100% local, in-memory. Zero network, zero telemetry.
 - **Canonical format** (MVP): OpenAI-compatible audit JSONL. See `inputExample/audit.log`.
 
-Status: early (0.1.0).
+Status: early (0.2.0).
+
+## Live watch
+
+A log file can be followed while an agent is still writing to it, so a run can
+be inspected as it happens instead of reloading by hand. Toggle it from the top
+bar, or pick **Watch a log file (live updates)** when opening. The file is
+polled every 500 ms and the view reparses whenever it changes.
+
+Recently opened files are listed on the start screen, each remembering whether
+it was opened static or watched.
+
+## Reasoning traces
+
+When a provider returns chain-of-thought (reasoning) content, it is extracted
+and shown alongside the regular response.
 
 ## Requirements
 
@@ -59,7 +74,7 @@ For a single portable `.exe` (no installer, copy-paste to a USB stick):
 pnpm tauri build --no-bundle
 ```
 
-Output: `src-tauri/target/release/llm-visor.exe` (~10–15 MB).
+Output: `src-tauri/target/release/threadlinelm.exe` (~10–15 MB).
 
 Other combinations:
 
@@ -88,7 +103,13 @@ In that case ship the **entire folder** (not just the `.exe`), because WebView2 
 
 ### Cross-compiling
 
-Cross-building between Windows / macOS / Linux from a single host is non-trivial — each target needs its native toolchain. For multi-OS releases the simplest path is a GitHub Actions matrix with `windows-latest`, `macos-latest`, `ubuntu-latest` runners.
+Cross-building between Windows / macOS / Linux from a single host is non-trivial — each target needs its native toolchain, so releases are built on CI instead.
+
+Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds on `windows-latest`, `macos-latest` (Apple Silicon and Intel) and `ubuntu-22.04`, then attaches the installers to a draft GitHub Release for review before publishing.
+
+```bash
+git tag -a v0.2.0 -m "v0.2.0" && git push origin v0.2.0
+```
 
 ## Project layout
 
@@ -108,7 +129,7 @@ inputExample/audit.log     canonical fixture (9 events)
 
 ## Contributing
 
-Issues and PRs welcome at <https://github.com/adeibe/ThreadlineLM>.
+Issues and PRs welcome at <https://github.com/aralde/ThreadlineLM>.
 
 ## License
 
