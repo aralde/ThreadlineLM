@@ -1,68 +1,110 @@
+<div align="center">
+
 # ThreadlineLM
 
-> Inspect, replay and graph LLM agent traces offline — operatorlm, OpenTelemetry GenAI and LiteLLM audit logs.
+**See what your LLM agent actually did: offline, from the logs you already have.**
 
-Offline forensic viewer for LLM calls. Drop a `.log` / `.jsonl` file on the window and get a timeline, per-call detail, per-session conversation reconstruction, flow graph (including tool calls), side-by-side comparison and metrics.
+[![Latest release](https://img.shields.io/github/v/release/aralde/ThreadlineLM?color=2ea44f)](https://github.com/aralde/ThreadlineLM/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/aralde/ThreadlineLM/total?color=2ea44f)](https://github.com/aralde/ThreadlineLM/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Built with Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#download)
+[![GitHub stars](https://img.shields.io/github/stars/aralde/ThreadlineLM?style=social)](https://github.com/aralde/ThreadlineLM/stargazers)
 
-- **Stack**: Tauri 2 + React + TypeScript + Vite + Tailwind v4. Rust backend.
-- **Privacy**: 100% local, in-memory. Zero network, zero telemetry.
-- **Formats**: OpenAI-compatible audit JSONL / JSON array, OpenTelemetry GenAI spans (plain or OTLP/JSON), LiteLLM `StandardLoggingPayload`, and audit records embedded in plain-text logs. The format is detected from the contents, not the extension.
+[**Download**](#download) · [Features](#features) · [Supported formats](#supported-formats) · [Build from source](#build-from-source)
 
-Status: early (0.2.0).
+<a href="docs/media/demo.mp4"><img src="docs/media/demo.gif" alt="ThreadlineLM demo: drop a log, then browse the reconstructed chat, tool-call graph, metrics and live updates" width="100%"></a>
 
-## Live watch
+<sub>Click the animation for the full-resolution video.</sub>
 
-A log file can be followed while an agent is still writing to it, so a run can
-be inspected as it happens instead of reloading by hand. Toggle it from the top
-bar, or pick **Watch a log file (live updates)** when opening. The file is
-polled every 500 ms and the view reparses whenever it changes.
+</div>
 
-Recently opened files are listed on the start screen, each remembering whether
-it was opened static or watched.
+When an agent run goes wrong, the evidence is in a log full of JSON: requests, responses, tool calls, streamed chunks, retries. ThreadlineLM is a desktop app that turns that file into a readable timeline, the reconstructed conversation per session, and a graph of every tool call. Drop the file on the window. Nothing leaves your machine.
 
-## Reasoning traces
+Reads **OpenAI-compatible audit logs**, **OpenTelemetry GenAI spans** and **LiteLLM** logs. The format is detected from the contents, so the file extension doesn't matter.
 
-When a provider returns chain-of-thought (reasoning) content, it is extracted
-and shown alongside the regular response.
+If it saves you a debugging session, a ⭐ helps other people find it.
 
-## Requirements
+## Download
 
-- Node 20+
-- pnpm 10+
-- Stable Rust toolchain (`rustup`)
-- Windows: Microsoft Edge WebView2 (usually preinstalled on Windows 10/11)
-- Linux: Tauri runtime dependencies (webkit2gtk, libayatana-appindicator, etc.)
+Grab the latest build from **[Releases](https://github.com/aralde/ThreadlineLM/releases/latest)**:
 
-## Development
+| Platform | File |
+|---|---|
+| Windows | `ThreadlineLM_<version>_x64-setup.exe` (installer), `.msi`, or `_x64-portable.exe` (no install) |
+| macOS (Apple Silicon) | `ThreadlineLM_<version>_aarch64.dmg` |
+| macOS (Intel) | `ThreadlineLM_<version>_x64.dmg` |
+| Linux | `.AppImage`, `.deb` or `.rpm` |
+
+Then drop any file from [`inputExample/`](inputExample) onto the window to see it in action.
+
+> [!NOTE]
+> The binaries are not code-signed yet. On Windows, SmartScreen may warn: choose **More info → Run anyway**. On macOS, run `xattr -dr com.apple.quarantine /Applications/ThreadlineLM.app` once after installing.
+
+## Build from source
+
+Prerequisites: Node 20+, pnpm 10+, a stable Rust toolchain (`rustup`), and the [Tauri system dependencies](https://tauri.app/start/prerequisites/) for your OS (WebView2 on Windows is usually preinstalled).
 
 ```bash
+git clone https://github.com/aralde/ThreadlineLM
+cd ThreadlineLM
 pnpm install
 pnpm tauri dev
 ```
 
-Drop `inputExample/audit.log` onto the window. You should see:
+Then drop `inputExample/audit.log` onto the window. You should see 9 calls in the Timeline, the reconstructed chat in Detail, a user / assistant / tool-call graph, and p50/p95 latency in Metrics.
 
-- 9 rows in Timeline with providers `gemini`, `groq`, etc.
-- Detail with request/response and the reconstructed chat.
-- Graph for the selected session (user / assistant / tool_call nodes).
-- Metrics with p50/p95 latency, tokens and estimated cost.
+## Features
 
-Shortcuts: `Ctrl+1..5` to switch tabs.
+- **Rebuild the conversation.** Calls are grouped into sessions and replayed as a chat, including tool calls, tool results and reasoning (chain-of-thought) content when the provider returns it.
+- **Follow tool calls as a graph.** Every session becomes a flow graph of user, assistant and tool-call nodes, so loops and dead ends are visible at a glance.
+- **Watch a run live.** Follow a log while the agent is still writing to it; the view reparses every time the file changes (polled every 500 ms).
+- **Diff two calls.** Compare requests and responses side by side to see what changed between a working run and a broken one.
+- **Know what it cost.** Latency percentiles (p50/p95/p99), token counts, estimated cost, and call counts by provider and model.
+- **Private by design.** 100% local and in memory. No network calls, no telemetry, no account. Safe for logs with customer data or secrets.
+- **Search and export.** Fuzzy search across calls; export a session to Markdown for a bug report or a postmortem.
 
-### Example files
+Shortcuts: `Ctrl+1..5` switches between Timeline, Detail, Graph, Compare and Metrics.
 
-`inputExample/` holds one synthetic file per supported format, so every parser can be tried without real traces:
+## Supported formats
 
-| File | Format | Events |
+`inputExample/` holds one synthetic file per format, so every parser can be tried without real traces:
+
+| Format | Example file | Events |
 |---|---|---|
-| `audit.log` | OpenAI-compatible audit JSONL: tool calls, SSE stream, reasoning, Anthropic `tool_use`, a 429 error | 9 |
-| `audit-array.json` | Same audit records, as a JSON array | 3 |
-| `otel-genai-spans.jsonl` | OpenTelemetry GenAI spans with plain attributes, one per line (a non-GenAI root span is skipped) | 3 |
-| `otel-genai-otlp.json` | OTLP/JSON export envelope (`resourceSpans`) with KeyValue attributes | 2 |
-| `litellm.jsonl` | LiteLLM `StandardLoggingPayload`: streamed response, tool use, embedding, failure | 5 |
-| `proxy-raw.log` | Plain-text proxy log with audit JSON embedded in some lines | 2 |
+| OpenAI-compatible audit JSONL: tool calls, SSE stream, reasoning, Anthropic `tool_use`, a 429 error | `audit.log` | 9 |
+| Same audit records as a JSON array | `audit-array.json` | 3 |
+| OpenTelemetry GenAI spans, plain attributes, one per line (non-GenAI spans are skipped) | `otel-genai-spans.jsonl` | 3 |
+| OTLP/JSON export envelope (`resourceSpans`) with KeyValue attributes | `otel-genai-otlp.json` | 2 |
+| LiteLLM `StandardLoggingPayload`: streamed response, tool use, embedding, failure | `litellm.jsonl` | 5 |
+| Plain-text proxy log with audit JSON embedded in some lines | `proxy-raw.log` | 2 |
 
-JSON documents must be one record per line (or a single-line OTLP envelope): pretty-printed multi-line JSON is not detected yet.
+Limitation: JSON must be one record per line (or a single-line OTLP envelope). Pretty-printed multi-line JSON is not detected yet.
+
+## How it works
+
+```mermaid
+graph LR
+    A[".log / .jsonl / .json"] --> B["detect format<br/>(Rust)"]
+    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · raw text"]
+    C --> D["sessions<br/>client + 10-min window"]
+    D --> E["React UI<br/>Timeline · Detail · Graph · Compare · Metrics"]
+```
+
+Parsing and session grouping run in the Rust backend; the React frontend gets typed results over Tauri IPC (the bridge between the Rust process and the web view). Stack: Tauri 2, React, TypeScript, Vite, Tailwind v4.
+
+```
+src/                       React + TS frontend
+  components/              one view per tab (Timeline, Detail, Graph, Compare, Metrics)
+  state/store.ts           Zustand store
+  ipc.ts                   typed wrappers around invoke()
+src-tauri/src/
+  parser/                  format detection and one parser per format
+  session.rs               grouping by client + 10-min window
+  export.rs                session_to_markdown
+  commands.rs              #[tauri::command] exposed to the frontend
+inputExample/              one synthetic example per supported format
+```
 
 ## Tests
 
@@ -79,29 +121,20 @@ The `parses_input_example` and `example_*` tests parse every file in `inputExamp
 pnpm tauri build
 ```
 
-Produces per-platform binaries under `src-tauri/target/release/bundle/` (Windows MSI/NSIS, macOS DMG, Linux AppImage/deb).
-
-### Portable binary (Windows)
-
-For a single portable `.exe` (no installer, copy-paste to a USB stick):
-
-```powershell
-pnpm tauri build --no-bundle
-```
-
-Output: `src-tauri/target/release/threadlinelm.exe` (~10–15 MB).
-
-Other combinations:
+Produces per-platform installers under `src-tauri/target/release/bundle/` (Windows MSI/NSIS, macOS DMG, Linux AppImage/deb).
 
 | Command | Output |
 |---|---|
 | `pnpm tauri build` | `.exe` + NSIS installer + `.msi` |
-| `pnpm tauri build --no-bundle` | portable `.exe` only |
+| `pnpm tauri build --no-bundle` | portable `.exe` only (~10–15 MB, `src-tauri/target/release/threadlinelm.exe`) |
 | `pnpm tauri build --bundles nsis` | NSIS installer only |
 
-**WebView2**: the `.exe` depends on Microsoft Edge WebView2 as its rendering engine. It is preinstalled on Windows 11. On older Windows 10 builds, if missing, it is downloaded on first launch.
+<details>
+<summary><b>Fully portable Windows build (no system WebView2)</b></summary>
 
-For a *truly portable* build that does not depend on the internet or the system WebView2 (≈ +150 MB overhead), embed the "Fixed Version Runtime" — download it from [aka.ms/webview2](https://developer.microsoft.com/microsoft-edge/webview2/) and add to `src-tauri/tauri.conf.json`:
+The `.exe` uses Microsoft Edge WebView2 as its rendering engine. It ships with Windows 11; on older Windows 10 builds it is downloaded on first launch if missing.
+
+To avoid depending on the system WebView2 or the internet (≈ +150 MB), embed the Fixed Version Runtime. Download it from [aka.ms/webview2](https://developer.microsoft.com/microsoft-edge/webview2/) and add to `src-tauri/tauri.conf.json`:
 
 ```json
 "bundle": {
@@ -114,38 +147,29 @@ For a *truly portable* build that does not depend on the internet or the system 
 }
 ```
 
-In that case ship the **entire folder** (not just the `.exe`), because WebView2 sits next to it.
+Ship the **entire folder**, not just the `.exe`, because WebView2 sits next to it.
 
-### Cross-compiling
+</details>
 
-Cross-building between Windows / macOS / Linux from a single host is non-trivial — each target needs its native toolchain, so releases are built on CI instead.
+<details>
+<summary><b>Releases and cross-compiling</b></summary>
 
-Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds on `windows-latest`, `macos-latest` (Apple Silicon and Intel) and `ubuntu-22.04`, then attaches the installers to a draft GitHub Release for review before publishing.
+Cross-building between Windows, macOS and Linux from one host needs each target's native toolchain, so releases are built on CI. Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds on `windows-latest`, `macos-latest` (Apple Silicon and Intel) and `ubuntu-22.04`, then attaches the installers and a portable Windows `.exe` to a draft GitHub Release for review before publishing.
 
 ```bash
-git tag -a v0.2.0 -m "v0.2.0" && git push origin v0.2.0
+git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
 ```
 
-## Project layout
+</details>
 
-```
-src/                       React + TS frontend
-  components/              UI per view (Timeline, Detail, Graph, Compare, Metrics)
-  state/store.ts           Zustand store
-  ipc.ts                   typed wrappers around invoke()
-src-tauri/
-  src/
-    parser/                detect, openai_audit, raw_text
-    session.rs             grouping by client + 10-min window
-    export.rs              session_to_markdown
-    commands.rs            #[tauri::command] exposed to the frontend
-inputExample/              one synthetic example per supported format
-```
+## Status
+
+Early: v0.3.0. Formats and views are stable enough for daily debugging; expect rough edges on unusual log shapes. If a log of yours isn't detected, an issue with a redacted sample is the most useful bug report.
 
 ## Contributing
 
-Issues and PRs welcome at <https://github.com/aralde/ThreadlineLM>.
+Issues and PRs welcome at <https://github.com/aralde/ThreadlineLM/issues>. New format parsers are especially welcome: add a synthetic sample to `inputExample/` and a test next to the existing `example_*` tests.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

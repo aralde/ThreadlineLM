@@ -126,7 +126,7 @@ export default function DropZone({ fullscreen = false }: { fullscreen?: boolean 
             {busy ? "Parsing..." : "Drop logs here"}
           </div>
           <div className="text-xs text-zinc-500 mt-1">
-            operatorlm · OpenTelemetry GenAI · LiteLLM
+            OpenAI-compatible audit · OpenTelemetry GenAI · LiteLLM
           </div>
           <div className="text-xs text-zinc-500 mt-1">
             or click to pick · 100% offline · nothing leaves your machine
