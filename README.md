@@ -6,7 +6,7 @@ Offline forensic viewer for LLM calls. Drop a `.log` / `.jsonl` file on the wind
 
 - **Stack**: Tauri 2 + React + TypeScript + Vite + Tailwind v4. Rust backend.
 - **Privacy**: 100% local, in-memory. Zero network, zero telemetry.
-- **Canonical format** (MVP): OpenAI-compatible audit JSONL. See `inputExample/audit.log`.
+- **Formats**: OpenAI-compatible audit JSONL / JSON array, OpenTelemetry GenAI spans (plain or OTLP/JSON), LiteLLM `StandardLoggingPayload`, and audit records embedded in plain-text logs. The format is detected from the contents, not the extension.
 
 Status: early (0.2.0).
 
@@ -49,6 +49,21 @@ Drop `inputExample/audit.log` onto the window. You should see:
 
 Shortcuts: `Ctrl+1..5` to switch tabs.
 
+### Example files
+
+`inputExample/` holds one synthetic file per supported format, so every parser can be tried without real traces:
+
+| File | Format | Events |
+|---|---|---|
+| `audit.log` | OpenAI-compatible audit JSONL: tool calls, SSE stream, reasoning, Anthropic `tool_use`, a 429 error | 9 |
+| `audit-array.json` | Same audit records, as a JSON array | 3 |
+| `otel-genai-spans.jsonl` | OpenTelemetry GenAI spans with plain attributes, one per line (a non-GenAI root span is skipped) | 3 |
+| `otel-genai-otlp.json` | OTLP/JSON export envelope (`resourceSpans`) with KeyValue attributes | 2 |
+| `litellm.jsonl` | LiteLLM `StandardLoggingPayload`: streamed response, tool use, embedding, failure | 5 |
+| `proxy-raw.log` | Plain-text proxy log with audit JSON embedded in some lines | 2 |
+
+JSON documents must be one record per line (or a single-line OTLP envelope): pretty-printed multi-line JSON is not detected yet.
+
 ## Tests
 
 ```bash
@@ -56,7 +71,7 @@ cd src-tauri
 cargo test
 ```
 
-The `parses_input_example` test validates the parser against `inputExample/audit.log`.
+The `parses_input_example` and `example_*` tests parse every file in `inputExample/` and check format detection and event counts.
 
 ## Build
 
@@ -124,7 +139,7 @@ src-tauri/
     session.rs             grouping by client + 10-min window
     export.rs              session_to_markdown
     commands.rs            #[tauri::command] exposed to the frontend
-inputExample/audit.log     canonical fixture (9 events)
+inputExample/              one synthetic example per supported format
 ```
 
 ## Contributing

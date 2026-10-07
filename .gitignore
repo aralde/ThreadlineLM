@@ -4,7 +4,7 @@ dist
 *.log
 src-tauri/target
 .vscode
-!inputExample/audit.log
+!inputExample/*.log
 
 # OS / editors
 Thumbs.db

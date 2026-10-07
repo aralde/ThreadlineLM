@@ -61,3 +61,64 @@ where
     }
     ParseOutcome { events, warnings }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::detect::{detect, Format};
+    use super::parse;
+    use crate::model::Provider;
+
+    fn load(name: &str) -> String {
+        let path = format!("../inputExample/{name}");
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
+    }
+
+    fn assert_example(name: &str, expected: Format, events: usize) -> super::ParseOutcome {
+        let content = load(name);
+        let format = detect(name, &content);
+        assert!(
+            std::mem::discriminant(&format) == std::mem::discriminant(&expected),
+            "{name}: unexpected format"
+        );
+        let out = parse(name, &content);
+        assert!(out.warnings.is_empty(), "{name}: {:?}", out.warnings);
+        assert_eq!(out.events.len(), events, "{name}: event count");
+        out
+    }
+
+    #[test]
+    fn example_audit_array() {
+        let out = assert_example("audit-array.json", Format::OperatorLm, 3);
+        assert!(matches!(out.events[0].provider, Provider::Xai));
+    }
+
+    #[test]
+    fn example_otel_spans() {
+        // The agent.run span has no gen_ai.* attributes and is skipped.
+        let out = assert_example("otel-genai-spans.jsonl", Format::OtelGenAi, 3);
+        let tool_turn = &out.events[0];
+        let calls = tool_turn.response.assistant.as_ref().and_then(|m| m.tool_calls.as_ref());
+        assert_eq!(calls.map(|c| c[0].name.as_str()), Some("search_docs"));
+        assert_eq!(out.events[2].status, 500);
+    }
+
+    #[test]
+    fn example_otel_otlp_envelope() {
+        let out = assert_example("otel-genai-otlp.json", Format::OtelGenAi, 2);
+        assert!(matches!(out.events[0].provider, Provider::Anthropic));
+        assert_eq!(out.events[1].endpoint, "/v1/embeddings");
+    }
+
+    #[test]
+    fn example_litellm() {
+        let out = assert_example("litellm.jsonl", Format::LiteLLM, 5);
+        let streamed = out.events[1].response.assistant.as_ref().unwrap();
+        assert_eq!(streamed.content.as_deref(), Some("Bonjour le monde."));
+        assert_eq!(out.events[4].status, 500);
+    }
+
+    #[test]
+    fn example_raw_text() {
+        assert_example("proxy-raw.log", Format::RawText, 2);
+    }
+}

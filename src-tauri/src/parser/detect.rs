@@ -28,18 +28,24 @@ pub fn detect(_name: &str, content: &str) -> Format {
     }
 
     if trimmed.starts_with('{') {
+        // Keep sniffing past unmarked lines: OTel exports usually open with a
+        // root span (e.g. `agent.run`) that carries no gen_ai.* attributes.
+        let mut saw_object = false;
         for line in content.lines().take(8) {
             let l = line.trim();
             if l.is_empty() {
                 continue;
             }
-            if l.starts_with('{') && l.ends_with('}') {
-                if let Some(f) = sniff_known_object(l) {
-                    return f;
-                }
-                return Format::OperatorLm;
+            if !(l.starts_with('{') && l.ends_with('}')) {
+                break;
             }
-            break;
+            if let Some(f) = sniff_known_object(l) {
+                return f;
+            }
+            saw_object = true;
+        }
+        if saw_object {
+            return Format::OperatorLm;
         }
     }
 
