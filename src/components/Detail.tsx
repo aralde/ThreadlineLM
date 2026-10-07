@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import Editor from "@monaco-editor/react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../state/store";
 import type { ChatMessage } from "../types";
+
+const JsonViewer = lazy(() => import("./JsonViewer"));
 
 function MessageBubble({
   m,
@@ -203,31 +204,19 @@ export default function Detail() {
           </div>
         )}
         {tab === "request" && (
-          <Editor
-            height="100%"
-            theme={monacoTheme}
-            language="json"
-            value={JSON.stringify(event.request, null, 2)}
-            options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12 }}
-          />
+          <Suspense fallback={null}>
+            <JsonViewer value={event.request} theme={monacoTheme} />
+          </Suspense>
         )}
         {tab === "response" && (
-          <Editor
-            height="100%"
-            theme={monacoTheme}
-            language="json"
-            value={JSON.stringify(event.response, null, 2)}
-            options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12 }}
-          />
+          <Suspense fallback={null}>
+            <JsonViewer value={event.response} theme={monacoTheme} />
+          </Suspense>
         )}
         {tab === "raw" && (
-          <Editor
-            height="100%"
-            theme={monacoTheme}
-            language="json"
-            value={JSON.stringify(event.raw, null, 2)}
-            options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12 }}
-          />
+          <Suspense fallback={null}>
+            <JsonViewer value={event.raw} theme={monacoTheme} />
+          </Suspense>
         )}
       </div>
     </div>

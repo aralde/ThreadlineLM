@@ -149,8 +149,10 @@ pub(crate) fn parse_response(body: Option<&Value>) -> ResponsePayload {
     let Some(body) = body else {
         return ResponsePayload::default();
     };
+    // A string body is either stringified JSON or raw SSE text; keep the
+    // latter as a string so extract_sse_text can pick it up.
     let body_val: Value = if let Some(s) = body.as_str() {
-        serde_json::from_str(s).unwrap_or(Value::Null)
+        serde_json::from_str(s).unwrap_or_else(|_| Value::String(s.to_string()))
     } else {
         body.clone()
     };

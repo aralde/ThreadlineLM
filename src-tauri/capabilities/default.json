@@ -1,15 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for ThreadlineLM",
+  "description": "Default capabilities for ThreadlineLM. File reads go through the load_file / start_watch commands; the webview has no direct filesystem access.",
   "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "dialog:default",
-    "fs:default",
-    {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "**" }]
-    }
-  ]
+  "permissions": ["core:default", "dialog:allow-open"]
 }
