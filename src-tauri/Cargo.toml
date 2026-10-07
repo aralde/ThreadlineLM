@@ -1,6 +1,6 @@
 [package]
 name = "threadlinelm"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Offline forensic viewer for LLM agent traces (Tauri backend)."
 license = "MIT"

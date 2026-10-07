@@ -65,7 +65,29 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "ThreadlineLM ${{ github.ref_name }}"
-          releaseBody: "Download the installer for your platform below. ThreadlineLM runs fully offline — no network, no telemetry."
+          releaseBody: |
+            ThreadlineLM runs fully offline: no network, no telemetry. Pick the file for your platform:
+
+            | Platform | File |
+            |---|---|
+            | Windows (installer) | `ThreadlineLM_*_x64-setup.exe` or `.msi` |
+            | Windows (portable, no install) | `ThreadlineLM_*_x64-portable.exe` |
+            | macOS Apple Silicon | `ThreadlineLM_*_aarch64.dmg` |
+            | macOS Intel | `ThreadlineLM_*_x64.dmg` |
+            | Linux | `.AppImage`, `.deb` or `.rpm` |
+
+            The binaries are not code-signed yet. On Windows, SmartScreen may warn: choose **More info → Run anyway**. On macOS, run `xattr -dr com.apple.quarantine /Applications/ThreadlineLM.app` after installing.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # tauri-action only uploads installers; also ship the bare .exe it built.
+      - name: Upload portable Windows executable
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          name="ThreadlineLM_${GITHUB_REF_NAME#v}_x64-portable.exe"
+          cp src-tauri/target/release/threadlinelm.exe "$name"
+          gh release upload "$GITHUB_REF_NAME" "$name" --clobber

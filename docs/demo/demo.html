@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ThreadlineLM demo</title>
+<meta name="viewport" content="width=1280" />
+<!--
+  Simulated ThreadlineLM UI used to render the README demo (docs/media/demo.gif|mp4).
+  The whole animation is a pure function of time: render(t), t in [0, DURATION].
+  Open in a browser to preview (autoplays), or render frames with record.ts.
+  All data shown is fictional.
+-->
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<style>
+  body { margin: 0; background: #09090b; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; overflow: hidden; }
+  .mono { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; }
+  .dots { background-image: radial-gradient(#27272a 1px, transparent 1px); background-size: 18px 18px; }
+  #caption em { font-style: normal; color: #34d399; }
+  svg.i { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+</style>
+</head>
+<body>
+<div id="stage" class="relative overflow-hidden" style="width:1280px;height:720px;background:radial-gradient(ellipse at 50% 0%, #10231c 0%, #09090b 60%)">
+
+  <!-- Intro / end card -->
+  <div id="brand" class="absolute inset-x-0 flex flex-col items-center" style="top:250px">
+    <div id="logo" class="flex items-center gap-4">
+      <span class="block rounded-full bg-emerald-400" style="width:26px;height:26px;box-shadow:0 0 40px #34d39988"></span>
+      <span class="text-zinc-50 font-bold tracking-tight" style="font-size:68px;line-height:1">ThreadlineLM</span>
+    </div>
+    <div class="relative w-full" style="height:120px;margin-top:26px">
+      <div id="tagline" class="absolute inset-x-0 text-center">
+        <div class="text-zinc-200" style="font-size:30px">See what your LLM agent <span class="text-emerald-400">actually did</span>.</div>
+        <div class="text-zinc-500 mt-3" style="font-size:18px">Offline viewer for LLM agent logs</div>
+      </div>
+      <div id="endcard" class="absolute inset-x-0 flex flex-col items-center gap-4">
+        <div class="flex gap-3" style="font-size:17px">
+          <span class="px-4 py-1.5 rounded-full border border-emerald-700 text-emerald-300 bg-emerald-950/60">100% offline</span>
+          <span class="px-4 py-1.5 rounded-full border border-emerald-700 text-emerald-300 bg-emerald-950/60">Zero telemetry</span>
+          <span class="px-4 py-1.5 rounded-full border border-emerald-700 text-emerald-300 bg-emerald-950/60">Open source · MIT</span>
+        </div>
+        <div class="text-zinc-400" style="font-size:17px">OpenTelemetry GenAI · LiteLLM · OpenAI-compatible logs</div>
+        <div class="mono text-zinc-100" style="font-size:20px">github.com/aralde/ThreadlineLM</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Caption -->
+  <div id="caption" class="absolute inset-x-0 text-center text-zinc-50 font-semibold tracking-tight" style="top:30px;font-size:34px;line-height:44px"></div>
+
+  <!-- App window -->
+  <div id="win" class="absolute rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden" style="left:50px;top:100px;width:1180px;height:600px;box-shadow:0 30px 80px #000c, 0 0 0 1px #ffffff08">
+    <!-- window chrome -->
+    <div class="absolute inset-x-0 top-0 flex items-center gap-2 px-3 bg-zinc-900 border-b border-zinc-800" style="height:28px">
+      <span class="w-3 h-3 rounded-full bg-zinc-700"></span><span class="w-3 h-3 rounded-full bg-zinc-700"></span><span class="w-3 h-3 rounded-full bg-zinc-700"></span>
+      <span id="wintitle" class="ml-3 text-zinc-500 text-xs">ThreadlineLM</span>
+    </div>
+
+    <!-- top bar -->
+    <div class="absolute inset-x-0 flex items-center gap-1 px-3 border-b border-zinc-800 bg-zinc-950" style="top:28px;height:44px">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 mr-2"></span>
+      <span class="text-zinc-50 font-bold text-[15px] mr-5">ThreadlineLM</span>
+      <div id="tabs" class="flex gap-1 text-[13px]"></div>
+      <div id="filepill" class="ml-4 flex items-center gap-2 px-3 h-7 rounded border border-emerald-800 bg-emerald-950/50 text-emerald-300 text-xs mono">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>audit.log
+      </div>
+      <div id="watchbtn" class="ml-2 flex items-center gap-1.5 px-3 h-7 rounded border text-xs font-medium">
+        <svg class="i" viewBox="0 0 24 24"><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg>
+        <span id="watchlabel">Watch</span>
+      </div>
+      <div class="ml-auto flex items-center gap-2 px-3 h-8 rounded border border-zinc-800 bg-zinc-900 text-zinc-500 text-xs" style="width:250px">
+        <svg class="i" viewBox="0 0 24 24"><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg>
+        Search messages, model, provider…
+      </div>
+    </div>
+
+    <!-- body -->
+    <div class="absolute inset-x-0 bottom-0" style="top:72px">
+      <!-- sidebar -->
+      <div id="sidebar" class="absolute left-0 top-0 bottom-0 border-r border-zinc-800 bg-zinc-950" style="width:240px">
+        <div id="sidehead" class="flex text-[13px] border-b border-zinc-800">
+          <div class="flex-1 py-2.5 text-center text-zinc-100 bg-zinc-900">Sessions (<span id="sesscount">8</span>)</div>
+          <div class="flex-1 py-2.5 text-center text-zinc-500">Files (1)</div>
+        </div>
+        <div id="sessions"></div>
+      </div>
+
+      <!-- main -->
+      <div id="main" class="absolute top-0 bottom-0 right-0" style="left:240px">
+        <div id="timeline" class="absolute inset-0">
+          <div class="flex items-center px-4 text-[11px] uppercase tracking-wider text-zinc-500 border-b border-zinc-800" style="height:34px">
+            <span style="width:110px">Time</span><span style="width:130px">Provider</span><span style="width:230px">Model</span><span style="width:90px">Status</span><span style="width:110px">Latency</span><span>Tokens in / out</span>
+          </div>
+          <div id="rows"></div>
+        </div>
+
+        <div id="detail" class="absolute top-0 bottom-0 right-0 border-l border-zinc-800 bg-zinc-950" style="width:480px">
+          <div class="px-4 pt-3 pb-2 border-b border-zinc-800">
+            <div class="flex items-baseline gap-3">
+              <span class="mono text-zinc-400 text-xs">req 7f3a91c2</span>
+              <span class="text-zinc-100 text-sm">openai / gpt-4.1-mini</span>
+              <span class="ml-auto mono text-xs text-zinc-400">2420 ms · <span class="text-emerald-400">200</span></span>
+            </div>
+            <div class="flex gap-5 mt-3 text-[13px]">
+              <span class="text-zinc-50 border-b-2 border-emerald-400 pb-1">Chat</span><span class="text-zinc-500">Request</span><span class="text-zinc-500">Response</span><span class="text-zinc-500">Raw</span>
+            </div>
+          </div>
+          <div id="chat" class="p-3 flex flex-col gap-2.5"></div>
+        </div>
+
+        <div id="graph" class="absolute inset-0 dots">
+          <svg id="edges" class="absolute inset-0" width="940" height="528"></svg>
+          <div id="nodes"></div>
+          <div class="absolute left-4 top-3 flex gap-1 text-xs">
+            <span class="px-3 py-1.5 rounded border border-zinc-800 bg-zinc-900 text-zinc-300">Expand all</span>
+            <span class="px-3 py-1.5 rounded border border-zinc-800 bg-zinc-900 text-zinc-300">Collapse all</span>
+            <span class="px-3 py-1.5 text-zinc-500">7 turns</span>
+          </div>
+        </div>
+
+        <div id="metrics" class="absolute inset-0 p-5">
+          <div id="cards" class="grid grid-cols-4 gap-4"></div>
+          <div class="mt-5 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+            <div class="text-[11px] uppercase tracking-wider text-zinc-500 mb-3">Requests by model</div>
+            <div id="bars" class="flex flex-col gap-3"></div>
+          </div>
+        </div>
+
+        <div id="drop" class="absolute inset-0 flex items-center justify-center">
+          <div id="dropbox" class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed" style="width:560px;height:250px">
+            <svg class="i text-zinc-400" style="width:34px;height:34px" viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 9l5 -5l5 5"/><path d="M12 4l0 12"/></svg>
+            <div class="text-zinc-100 font-semibold text-lg mt-3">Drop logs here</div>
+            <div class="text-zinc-500 text-sm mt-1">operatorlm · OpenTelemetry GenAI · LiteLLM</div>
+            <div class="text-zinc-500 text-sm">100% offline · nothing leaves your machine</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- raw log (problem scene): covers top bar + body -->
+    <div id="raw" class="absolute inset-x-0 bottom-0 overflow-hidden" style="top:28px;background:#0c0c0e">
+      <div id="rawtext" class="mono text-[12px] leading-[19px] px-4 py-3 whitespace-nowrap text-zinc-500"></div>
+    </div>
+  </div>
+
+  <!-- dragged file -->
+  <div id="filechip" class="absolute flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-600 bg-zinc-800 text-zinc-100 text-sm mono" style="left:0;top:0;box-shadow:0 10px 30px #000a">
+    <svg class="i" viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+    audit.log
+  </div>
+
+  <div id="ripple" class="absolute rounded-full border-2 border-emerald-400" style="width:40px;height:40px;left:0;top:0"></div>
+  <svg id="cursor" class="absolute" style="left:0;top:0;width:24px;height:24px" viewBox="0 0 24 24">
+    <path d="M4 2 L4 19 L8.5 15 L11.5 21.5 L14 20.3 L11 14 L17 14 Z" fill="#fff" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/>
+  </svg>
+</div>
+
+<script>
+const DURATION = 30;
+
+// ---------- data (fictional) ----------
+const TABS = [
+  ['Timeline', '<path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/>'],
+  ['Detail', '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><path d="M9 13h6"/><path d="M9 17h6"/>'],
+  ['Graph', '<path d="M7 18m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M7 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 6m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M7 8l0 8"/><path d="M9 18h6a2 2 0 0 0 2 -2v-5"/><path d="M14 14l3 -3l3 3"/>'],
+  ['Compare', '<path d="M6 6m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z"/><path d="M12 6v12"/>'],
+  ['Metrics', '<path d="M3 12h4l3 8l4 -16l3 8h4"/>'],
+  ['Recents', '<path d="M12 8l0 4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/>'],
+];
+const SESSIONS = [
+  ['fix-flaky-tests', '6 req · 14s · 14:02:11'],
+  ['refactor-auth', '4 req · 9s · 13:51:40'],
+  ['triage-issues', '11 req · 41s · 13:30:02'],
+  ['summarize-pr-212', '2 req · 3s · 13:12:55'],
+  ['db-migration-plan', '7 req · 22s · 12:48:19'],
+  ['docs-agent', '3 req · 6s · 12:20:07'],
+  ['release-notes', '5 req · 12s · 11:58:33'],
+  ['eval-run-03', '9 req · 31s · 11:31:46'],
+];
+const ROWS = [
+  ['14:02:11', 'openai', 'gpt-4.1-mini', 200, '1.84 s', '2.1k / 312'],
+  ['14:02:14', 'openai', 'gpt-4.1-mini', 200, '2.42 s', '3.4k / 128'],
+  ['14:02:19', 'groq', 'llama-3.3-70b', 200, '0.61 s', '1.2k / 404'],
+  ['14:02:23', 'local', 'qwen2.5-coder-32b', 200, '4.10 s', '5.8k / 902'],
+  ['14:02:31', 'openrouter', 'gpt-oss-120b', 429, '0.20 s', '—'],
+  ['14:02:33', 'openrouter', 'gpt-oss-120b', 200, '3.05 s', '4.0k / 611'],
+  ['14:02:40', 'mistral', 'mistral-medium', 200, '1.12 s', '900 / 220'],
+  ['14:02:44', 'openai', 'gpt-4.1-mini', 200, '1.97 s', '6.1k / 145'],
+  ['14:02:49', 'local', 'qwen2.5-coder-32b', 200, '3.66 s', '6.3k / 780'],
+  ['14:02:58', 'groq', 'llama-3.3-70b', 500, '0.09 s', '—'],
+  ['14:03:01', 'openai', 'gpt-4.1-mini', 200, '1.71 s', '6.8k / 233'],
+  ['14:03:04', 'mistral', 'mistral-medium', 200, '0.98 s', '1.1k / 98'],
+  ['14:03:09', 'local', 'qwen2.5-coder-32b', 200, '2.87 s', '7.0k / 514'],
+  ['14:03:12', 'openai', 'gpt-4.1-mini', 200, '1.62 s', '7.2k / 180'],
+];
+const LIVE_ROWS = [
+  ['14:05:31', 'openai', 'gpt-4.1-mini', 200, '1.52 s', '7.9k / 204'],
+  ['14:05:29', 'local', 'qwen2.5-coder-32b', 200, '3.21 s', '7.6k / 655'],
+  ['14:05:26', 'groq', 'llama-3.3-70b', 200, '0.58 s', '7.4k / 96'],
+];
+// [kind, label, body]
+const STYLE = {
+  system:    { border: '#3f3f46', bg: '#18181b',   label: '#a1a1aa' },
+  user:      { border: '#0369a1', bg: '#082f49cc', label: '#7dd3fc' },
+  toolcall:  { border: '#7c3aed', bg: '#2e1065cc', label: '#c4b5fd' },
+  toolres:   { border: '#c2410c', bg: '#431407cc', label: '#fdba74' },
+  thinking:  { border: '#a21caf', bg: '#4a044ecc', label: '#f0abfc' },
+  assistant: { border: '#047857', bg: '#022c22cc', label: '#6ee7b7' },
+};
+const CHAT = [
+  ['user', 'USER', 'CI is flaky on tests/api.spec.ts. Find the cause and fix it.'],
+  ['toolcall', 'ASSISTANT · TOOL CALL', '<span class="text-sky-400">read_file</span>({"path":"tests/api.spec.ts"})'],
+  ['toolres', 'TOOL', 'beforeAll() hits the real staging API over the network'],
+  ['thinking', 'THINKING', 'Live HTTP call makes it flaky. Mock the client.'],
+  ['toolcall', 'ASSISTANT · TOOL CALL', '<span class="text-sky-400">edit_file</span>({"path":"tests/api.spec.ts","patch":"…"})'],
+  ['assistant', 'ASSISTANT', 'Mocked the HTTP client. 20/20 runs green.'],
+];
+const NODES = [
+  ['system', 'SYSTEM', 'You are a coding agent. Use the tools…'],
+  ['user', 'USER', 'CI is flaky on api.spec.ts. Find the cause.'],
+  ['toolcall', 'TOOL CALL · READ_FILE', 'read_file({"path":"tests/api.spec.ts"})'],
+  ['toolres', 'TOOL RESULT', 'beforeAll() hits the real staging API'],
+  ['thinking', 'THINKING', 'Depends on a live HTTP call. Mock the client.'],
+  ['toolcall', 'TOOL CALL · EDIT_FILE', 'edit_file({"path":"tests/api.spec.ts", …})'],
+  ['assistant', 'ASSISTANT', 'Mocked the HTTP client. 20/20 runs green.'],
+];
+const CARDS = [
+  ['Requests', v => Math.round(194 * v), '4 errors'],
+  ['Latency p50 / p95', v => `${Math.round(1840 * v)} / ${Math.round(4100 * v)} ms`, 'max 6020 ms'],
+  ['Tokens in / out', v => `${(453.5 * v).toFixed(1)}k / ${(110.4 * v).toFixed(1)}k`, '188/194 req with usage'],
+  ['Estimated cost', v => `$${(0.87 * v).toFixed(2)}`, 'built-in pricing table'],
+];
+const BARS = [['gpt-4.1-mini', 92], ['qwen2.5-coder-32b', 48], ['llama-3.3-70b', 31], ['gpt-oss-120b', 15], ['mistral-medium', 8]];
+const CAPTIONS = [
+  [3.0, 6.9, 'Raw agent logs are <em>unreadable</em>.'],
+  [7.0, 10.9, 'Drop the log. <em>That’s it.</em>'],
+  [11.0, 16.0, 'Every call, rebuilt <em>as a chat</em>.'],
+  [16.1, 20.6, 'Tool calls and reasoning, <em>as a graph</em>.'],
+  [20.7, 24.6, 'Latency, tokens, cost. <em>At a glance.</em>'],
+  [24.7, 27.6, 'Watch agent runs <em>live</em>.'],
+];
+
+// ---------- build DOM ----------
+const $ = id => document.getElementById(id);
+const icon = p => `<svg class="i" viewBox="0 0 24 24">${p}</svg>`;
+$('tabs').innerHTML = TABS.map(([n, p]) =>
+  `<div data-tab="${n}" class="flex items-center gap-1.5 px-3 h-8 rounded">${icon(p)}${n}</div>`).join('');
+$('sessions').innerHTML = SESSIONS.map(([n, s], i) =>
+  `<div class="sess px-4 py-2.5 border-b border-zinc-900"><div class="flex items-center gap-2"><span class="mono text-zinc-100 text-[13px]">${n}</span>${i === 0 ? '<span id="livedot" class="w-2 h-2 rounded-full bg-emerald-400"></span>' : ''}</div><div class="text-zinc-500 text-xs mt-0.5"${i === 0 ? ' id="sess0"' : ''}>${s}</div></div>`).join('');
+const statusColor = s => s === 200 ? 'text-emerald-400' : s === 429 ? 'text-amber-400' : 'text-red-400';
+const rowHtml = (r, cls) => `<div class="${cls} relative flex items-center px-4 text-[13px] border-b border-zinc-900 overflow-hidden" style="height:34px">
+  <div class="flash absolute inset-0 bg-emerald-500/20"></div>
+  <span class="mono text-zinc-400 relative" style="width:110px">${r[0]}</span><span class="text-zinc-300 relative" style="width:130px">${r[1]}</span>
+  <span class="mono text-zinc-100 relative" style="width:230px">${r[2]}</span><span class="mono relative ${statusColor(r[3])}" style="width:90px">${r[3]}</span>
+  <span class="mono text-zinc-300 relative" style="width:110px">${r[4]}</span><span class="mono text-zinc-400 relative">${r[5]}</span></div>`;
+$('rows').innerHTML = LIVE_ROWS.map(r => rowHtml(r, 'liverow')).join('') + ROWS.map(r => rowHtml(r, 'row')).join('');
+const box = ([k, label, body], extra = '') => {
+  const s = STYLE[k];
+  return `<div class="rounded-md border px-3 py-2 ${extra}" style="border-color:${s.border};background:${s.bg}">
+    <div class="text-[10px] font-semibold tracking-wider mb-1" style="color:${s.label}">${label}</div>
+    <div class="mono text-[12.5px] text-zinc-100 leading-snug">${body}</div></div>`;
+};
+$('chat').innerHTML = CHAT.map(m => box(m, 'msg')).join('');
+const NODE_W = 360, NODE_H = 50, NODE_GAP = 20, NODE_X = (940 - NODE_W) / 2, NODE_Y0 = 30;
+$('nodes').innerHTML = NODES.map((n, i) =>
+  `<div class="node absolute" style="left:${NODE_X}px;top:${NODE_Y0 + i * (NODE_H + NODE_GAP)}px;width:${NODE_W}px">${box(n, 'truncate')}</div>`).join('');
+$('edges').innerHTML = NODES.slice(1).map((_, i) => {
+  const x = NODE_X + NODE_W / 2, y1 = NODE_Y0 + i * (NODE_H + NODE_GAP) + NODE_H + 2, y2 = y1 + NODE_GAP - 4;
+  return `<g class="edge"><line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="#a78bfa" stroke-width="1.6" stroke-dasharray="4 3"/><circle cx="${x}" cy="${y2}" r="2.6" fill="#a78bfa"/></g>`;
+}).join('');
+$('cards').innerHTML = CARDS.map(([l, , sub]) =>
+  `<div class="card rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3"><div class="text-[11px] uppercase tracking-wider text-zinc-500">${l}</div><div class="val mono text-zinc-50 text-[19px] mt-1 whitespace-nowrap"></div><div class="text-zinc-500 text-xs mt-1">${sub}</div></div>`).join('');
+$('bars').innerHTML = BARS.map(([m, n]) =>
+  `<div class="flex items-center gap-3 text-[13px]"><span class="mono text-zinc-300" style="width:170px">${m}</span><div class="flex-1 h-3 rounded bg-zinc-800/60"><div class="bar h-3 rounded bg-emerald-500" style="width:0"></div></div><span class="bn mono text-zinc-400 text-right" style="width:30px"></span></div>`).join('');
+// raw JSONL wall
+const rawLines = [];
+for (let i = 0; i < 70; i++) {
+  const r = ROWS[i % ROWS.length];
+  rawLines.push(`{"ts":"2026-10-07T${r[0]}.${(i * 37) % 1000}Z","provider":"${r[1]}","model":"${r[2]}","status":${r[3]},"latency_ms":${1000 + (i * 271) % 4000},"request":{"messages":[{"role":"system","content":"You are a coding agent working inside the repo. Use the tools to inspect and edit files…"},{"role":"user","content":"CI is flaky on tests/api.spec.ts…"}],"tools":[{"type":"function","function":{"name":"read_file","parameters":{"type":"object"}}}]},"response":{"choices":[{"message":{"tool_calls":[{"id":"call_${(i * 7919).toString(16)}","function":{"name":"edit_file","arguments":"{\\"path\\":\\"tests/api.spec.ts\\"}"}}]}}],"usage":{"prompt_tokens":${2000 + i * 61},"completion_tokens":${90 + (i * 13) % 800}}}}`);
+}
+$('rawtext').innerHTML = rawLines.map(l => `<div>${l}</div>`).join('');
+
+// ---------- timing helpers ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const outBack = x => { const c = 1.5; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const p = (t, a, b, f = ease) => f(clamp((t - a) / (b - a)));
+// visible window [a, b] with fade d
+const win = (t, a, b, d = 0.3) => Math.min(p(t, a, a + d), 1 - p(t, b - d, b));
+const set = (el, o) => Object.assign(el.style, o);
+const lerp = (a, b, k) => a + (b - a) * k;
+
+let anchors = null;
+const center = el => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+function computeAnchors() {
+  const tab = n => center(document.querySelector(`[data-tab="${n}"]`));
+  const row = center(document.querySelectorAll('.row')[1]);
+  render(8);
+  const drop = center($('dropbox'));
+  render(15);
+  anchors = {
+    start: [1190, 700], drop, row: [row[0] - 140, row[1]],
+    graph: tab('Graph'), metrics: tab('Metrics'), watch: center($('watchbtn')),
+    rest1: [760, 640], rest2: [1080, 650], rest3: [980, 660], rest4: [1120, 640],
+  };
+}
+// [time, anchor]; consecutive equal anchors = hold
+const PATH = () => [
+  [7.2, 'start'], [8.6, 'drop'], [10.4, 'drop'], [11.3, 'row'], [11.6, 'row'], [12.3, 'rest1'],
+  [15.4, 'rest1'], [16.0, 'graph'], [16.3, 'graph'], [16.9, 'rest2'],
+  [20.1, 'rest2'], [20.6, 'metrics'], [20.9, 'metrics'], [21.5, 'rest3'],
+  [24.1, 'rest3'], [24.6, 'watch'], [24.9, 'watch'], [25.5, 'rest4'], [30, 'rest4'],
+];
+const CLICKS = [11.5, 16.2, 20.8, 24.8];
+function cursorAt(t) {
+  if (!anchors) return [0, 0]; // first renders happen while measuring
+  const path = PATH();
+  if (t <= path[0][0]) return anchors[path[0][1]];
+  for (let i = 0; i < path.length - 1; i++) {
+    const [ta, a] = path[i], [tb, b] = path[i + 1];
+    if (t <= tb) { const k = p(t, ta, tb); return [lerp(anchors[a][0], anchors[b][0], k), lerp(anchors[a][1], anchors[b][1], k)]; }
+  }
+  return anchors[path[path.length - 1][1]];
+}
+const activeTab = t => t < 11.5 ? 'Timeline' : t < 16.2 ? 'Detail' : t < 20.8 ? 'Graph' : t < 24.8 ? 'Metrics' : 'Timeline';
+
+// ---------- render(t) ----------
+function render(t) {
+  // brand card: intro (0–2.9) and end card (27.9–30), seamless loop
+  const brandIn = Math.max(1 - p(t, 2.3, 2.9), p(t, 27.7, 28.3));
+  set($('brand'), { opacity: brandIn, transform: `scale(${lerp(0.94, 1, brandIn)})` });
+  set($('tagline'), { opacity: Math.max(1 - p(t, 2.0, 2.6), p(t, 29.5, 30)) });
+  const endK = win(t, 28.1, 29.6, 0.35);
+  set($('endcard'), { opacity: endK, transform: `translateY(${(1 - p(t, 28.1, 28.6)) * 10}px)` });
+
+  // caption
+  const cap = CAPTIONS.find(([a, b]) => t >= a && t <= b);
+  $('caption').innerHTML = cap ? cap[2] : '';
+  const ck = cap ? win(t, cap[0], cap[1], 0.3) : 0;
+  set($('caption'), { opacity: ck, transform: `translateY(${(1 - ck) * 8}px)` });
+
+  // window
+  const winK = Math.min(p(t, 2.5, 3.1), 1 - p(t, 27.6, 28.1));
+  set($('win'), { opacity: winK, transform: `translateY(${(1 - winK) * 24}px) scale(${lerp(0.96, 1, winK)})` });
+  const rawK = 1 - p(t, 6.8, 7.2);
+  set($('raw'), { opacity: rawK, display: rawK > 0 ? 'block' : 'none' });
+  // lines get appended like a log being written (cheap for GIF diffing, unlike scrolling)
+  document.querySelectorAll('#rawtext > div').forEach((el, i) => { el.style.visibility = t >= 3.1 + i * 0.045 ? 'visible' : 'hidden'; });
+  $('wintitle').textContent = t < 7 ? 'audit.log — 2.4 MB' : 'ThreadlineLM';
+
+  // top bar
+  const loaded = p(t, 8.9, 9.3);
+  const tab = activeTab(t);
+  document.querySelectorAll('[data-tab]').forEach(el => {
+    const on = el.dataset.tab === tab;
+    set(el, { background: on ? '#27272a' : 'transparent', color: on ? '#fafafa' : loaded > 0.5 || el.dataset.tab === 'Timeline' ? '#a1a1aa' : '#52525b' });
+  });
+  set($('filepill'), { opacity: loaded });
+  set($('sidehead'), { opacity: loaded });
+  const live = t >= 24.8;
+  const pulse = live ? 0.55 + 0.45 * Math.cos((t - 24.8) * Math.PI * 2) : 1;
+  set($('watchbtn'), {
+    opacity: loaded, background: live ? '#059669' : 'transparent', borderColor: live ? '#10b981' : '#3f3f46',
+    color: live ? '#ecfdf5' : '#a1a1aa', boxShadow: live ? `0 0 ${14 * pulse}px #10b98199` : 'none',
+  });
+  $('watchlabel').textContent = live ? 'Live' : 'Watch';
+
+  // drop zone + dragged file
+  const over = t > 8.15 && t < 8.9;
+  set($('drop'), { opacity: 1 - p(t, 8.8, 9.1), display: t < 9.1 ? 'flex' : 'none' });
+  set($('dropbox'), { borderColor: over ? '#34d399' : '#3f3f46', background: over ? '#022c2266' : 'transparent' });
+  const [cx, cy] = cursorAt(t);
+  const chipK = win(t, 7.2, 8.9, 0.2);
+  set($('filechip'), { opacity: chipK, transform: `translate(${cx + 10}px, ${cy + 14}px) scale(${lerp(0.6, 1, chipK)})` });
+
+  // sidebar sessions
+  document.querySelectorAll('.sess').forEach((el, i) => {
+    const k = p(t, 9.0 + i * 0.08, 9.4 + i * 0.08);
+    set(el, { opacity: k, transform: `translateX(${(1 - k) * -16}px)` });
+  });
+  const extra = t < 25.4 ? 0 : t < 26.1 ? 1 : t < 26.8 ? 2 : 3;
+  $('sess0').textContent = `${6 + extra} req · ${14 + extra * 3}s · 14:02:11`;
+  $('sesscount').textContent = 8;
+  set($('livedot'), { opacity: live ? pulse : 0 });
+
+  // timeline
+  const tlK = Math.min(p(t, 8.9, 9.2), 1 - p(t, 16.2, 16.5)) + p(t, 24.8, 25.1);
+  set($('timeline'), { opacity: clamp(tlK), display: tlK > 0 ? 'block' : 'none' });
+  document.querySelectorAll('.row').forEach((el, i) => {
+    const k = p(t, 9.1 + i * 0.07, 9.45 + i * 0.07);
+    const sel = i === 1 && t >= 11.5 && t < 24.8;
+    set(el, { opacity: k, transform: `translateY(${(1 - k) * 10}px)`, background: sel ? '#18181b' : 'transparent', boxShadow: sel ? 'inset 3px 0 0 #34d399' : 'none' });
+    el.querySelector('.flash').style.opacity = 0;
+  });
+  // live rows are stacked newest-first: index 0 arrives last
+  [26.8, 26.1, 25.4].forEach((ta, i) => {
+    const el = document.querySelectorAll('.liverow')[i];
+    const k = p(t, ta, ta + 0.35);
+    set(el, { height: `${34 * k}px`, opacity: k, borderBottomWidth: k > 0 ? '1px' : '0' });
+    el.querySelector('.flash').style.opacity = t >= ta ? 1 - p(t, ta + 0.3, ta + 1.4, x => x) : 0;
+  });
+
+  // detail
+  const dK = Math.min(p(t, 11.6, 12.0), 1 - p(t, 16.2, 16.5));
+  set($('detail'), { opacity: dK, transform: `translateX(${(1 - p(t, 11.6, 12.0)) * 60}px)`, display: dK > 0 ? 'block' : 'none' });
+  document.querySelectorAll('.msg').forEach((el, i) => {
+    const k = p(t, 12.1 + i * 0.55, 12.45 + i * 0.55);
+    set(el, { opacity: k, transform: `translateY(${(1 - k) * 12}px)` });
+  });
+
+  // graph
+  const gK = Math.min(p(t, 16.3, 16.6), 1 - p(t, 20.8, 21.1));
+  set($('graph'), { opacity: gK, display: gK > 0 ? 'block' : 'none' });
+  document.querySelectorAll('.node').forEach((el, i) => {
+    const k = p(t, 16.6 + i * 0.42, 17.0 + i * 0.42, outBack);
+    const glow = NODES[i][0] === 'toolcall' ? win(t, 19.5, 20.7, 0.35) : 0;
+    set(el, { opacity: clamp(k), transform: `scale(${lerp(0.85, 1, k)})`, filter: glow ? `drop-shadow(0 0 ${12 * glow}px #a78bfa)` : 'none' });
+  });
+  document.querySelectorAll('.edge').forEach((el, i) => {
+    const k = p(t, 16.85 + i * 0.42, 17.15 + i * 0.42);
+    set(el, { opacity: k });
+    el.querySelector('line').style.strokeDashoffset = -((t * 12) % 7);
+  });
+
+  // metrics
+  const mK = Math.min(p(t, 20.9, 21.2), 1 - p(t, 24.8, 25.1));
+  set($('metrics'), { opacity: mK, display: mK > 0 ? 'block' : 'none' });
+  document.querySelectorAll('.card').forEach((el, i) => {
+    const k = p(t, 21.0 + i * 0.12, 21.4 + i * 0.12);
+    set(el, { opacity: k, transform: `translateY(${(1 - k) * 10}px)` });
+    el.querySelector('.val').textContent = CARDS[i][1](p(t, 21.1, 22.8));
+  });
+  document.querySelectorAll('.bar').forEach((el, i) => {
+    const k = p(t, 21.6 + i * 0.1, 22.5 + i * 0.1);
+    el.style.width = `${(BARS[i][1] / 92) * 100 * k}%`;
+    el.parentElement.nextElementSibling.textContent = Math.round(BARS[i][1] * k);
+  });
+
+  // cursor + click ripple
+  const curK = win(t, 7.1, 27.5, 0.25);
+  const press = CLICKS.some(c => t >= c && t < c + 0.12);
+  set($('cursor'), { opacity: curK, transform: `translate(${cx - 4}px, ${cy - 2}px) scale(${press ? 0.85 : 1})` });
+  const click = CLICKS.find(c => t >= c && t < c + 0.5);
+  const rk = click ? (t - click) / 0.5 : 1;
+  set($('ripple'), { opacity: click ? 1 - rk : 0, transform: `translate(${cx - 20}px, ${cy - 20}px) scale(${0.3 + rk * 0.9})` });
+}
+
+// ---------- boot ----------
+function boot() {
+  computeAnchors();
+  render(0);
+  window.__render = render;
+  window.__duration = DURATION;
+  window.__ready = true;
+  if (!new URLSearchParams(location.search).has('capture')) {
+    const t0 = performance.now();
+    const loop = now => { render(((now - t0) / 1000) % DURATION); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  }
+}
+// let the Tailwind CDN compile classes before measuring layout
+window.addEventListener('load', () => setTimeout(boot, 300));
+</script>
+</body>
+</html>
