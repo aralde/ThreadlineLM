@@ -4,6 +4,8 @@
 
 **Offline LLM agent viewer (portable ~5 MB). Parse OpenAI-compatible, LiteLLM, and OpenTelemetry logs into visual timelines and tool-call graphs, 100% locally.**
 
+**English** | [Español](README.es.md) | [Português](README.pt.md) | [Français](README.fr.md) | [简体中文](README.zh.md)
+
 [![Latest release](https://img.shields.io/github/v/release/aralde/ThreadlineLM?color=2ea44f)](https://github.com/aralde/ThreadlineLM/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/aralde/ThreadlineLM/total?color=2ea44f)](https://github.com/aralde/ThreadlineLM/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
