@@ -2,7 +2,7 @@
 
 # ThreadlineLM
 
-**See what your LLM agent actually did: offline, from the logs you already have.**
+**Offline LLM agent viewer (portable ~5 MB). Parse OpenAI-compatible, LiteLLM, and OpenTelemetry logs into visual timelines and tool-call graphs, 100% locally.**
 
 [![Latest release](https://img.shields.io/github/v/release/aralde/ThreadlineLM?color=2ea44f)](https://github.com/aralde/ThreadlineLM/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/aralde/ThreadlineLM/total?color=2ea44f)](https://github.com/aralde/ThreadlineLM/releases)
@@ -13,9 +13,9 @@
 
 [**Download**](#download) · [Features](#features) · [Supported formats](#supported-formats) · [Build from source](#build-from-source)
 
-<a href="docs/media/demo.mp4"><img src="docs/media/demo.gif" alt="ThreadlineLM demo: drop a log, then browse the reconstructed chat, tool-call graph, metrics and live updates" width="100%"></a>
+<a href="docs/media/demo.mp4"><img src="docs/media/demo.gif" alt="The Timeline lists calls by provider, model, status, latency and tokens, then the Detail tab rebuilds one call as a chat: a user message, an assistant read_file tool call, the tool result, a thinking block, an edit_file call and the final assistant reply. The Graph tab then shows the same session as a vertical flow of system, user, tool call, tool result, thinking and assistant nodes, and the Metrics tab shows latency percentiles, token counts, estimated cost and requests by model. A &quot;Watch agent runs live&quot; caption follows, then the ThreadlineLM logo." width="100%"></a>
 
-<sub>Click the animation for the full-resolution video.</sub>
+<sub>Demo uses synthetic data. Click the animation for the full-resolution video.</sub>
 
 </div>
 
