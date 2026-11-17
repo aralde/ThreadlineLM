@@ -164,7 +164,7 @@ pub struct SourceFile {
     pub events: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConversationTurn {
     pub event_id: String,
     pub role: String,
@@ -173,6 +173,16 @@ pub struct ConversationTurn {
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+    /// Detail-view anchor (`msg:<i>` / `resp`) inside `event_id`, when the
+    /// turns of a session come from several events.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub focus: Option<String>,
+    /// Set on turns that belong to a subagent transcript.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
+    /// Tool call of the parent conversation that spawned the subagent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_tool_call_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
