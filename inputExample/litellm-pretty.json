@@ -1,0 +1,37 @@
+{
+  "id": "litellm-0001",
+  "call_type": "acompletion",
+  "custom_llm_provider": "openai",
+  "api_base": "https://api.openai.com/v1",
+  "model": "gpt-4o-mini",
+  "startTime": "2026-05-17T16:00:00.000Z",
+  "endTime": "2026-05-17T16:00:00.850Z",
+  "status": "success",
+  "requester_ip_address": "10.0.0.12",
+  "metadata": {
+    "user_api_key_alias": "team-docs"
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "Give me a title for a post about LLM tracing."
+    }
+  ],
+  "response": {
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "Seeing Inside Your Agents"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 15,
+      "completion_tokens": 5,
+      "total_tokens": 20
+    }
+  }
+}

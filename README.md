@@ -81,7 +81,7 @@ Shortcuts: `Ctrl+1..5` switches between Timeline, Detail, Graph, Compare and Met
 | LiteLLM `StandardLoggingPayload`: streamed response, tool use, embedding, failure | `litellm.jsonl` | 5 |
 | Plain-text proxy log with audit JSON embedded in some lines | `proxy-raw.log` | 2 |
 
-Limitation: JSON must be one record per line (or a single-line OTLP envelope). Pretty-printed multi-line JSON is not detected yet.
+Pretty-printed multi-line JSON (a single object or an array) opens like any other file.
 
 ## How it works
 
