@@ -1,3 +1,4 @@
+import { isTranscript } from "../lib/transcript";
 import { useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import Fuse from "fuse.js";
@@ -123,9 +124,11 @@ export default function Timeline() {
                   {e.model}
                 </div>
                 <div className={`font-mono ${statusColor(e.status)}`}>
-                  {e.status}
+                  {isTranscript(e) ? "—" : e.status}
                 </div>
-                <div className="font-mono text-zinc-400">{e.duration_ms} ms</div>
+                <div className="font-mono text-zinc-400">
+                  {isTranscript(e) ? "—" : `${e.duration_ms} ms`}
+                </div>
                 <div className="font-mono text-zinc-500">
                   {e.response.usage.total_tokens ?? "—"}
                 </div>

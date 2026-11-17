@@ -1,3 +1,4 @@
+import { isTranscript } from "../lib/transcript";
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../state/store";
 import type { ChatMessage } from "../types";
@@ -147,7 +148,9 @@ export default function Detail() {
           <span className="text-zinc-400">/</span>
           <span className="text-zinc-200">{event.model}</span>
           <span className="ml-auto font-mono text-zinc-500">
-            {event.duration_ms} ms · status {event.status}
+            {isTranscript(event)
+              ? "latency and status not recorded"
+              : `${event.duration_ms} ms · status ${event.status}`}
           </span>
         </div>
         <div className="text-[10px] text-zinc-500 mt-1 font-mono">

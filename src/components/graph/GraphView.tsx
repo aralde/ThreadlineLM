@@ -148,6 +148,9 @@ interface TurnView {
   eventId: string;
   /** Detail-panel target: "msg:<i>", "resp", or "tc:<id>". */
   focusTarget: string;
+  agentId?: string;
+  parentToolCallId?: string;
+  toolCallId?: string;
 }
 
 function previewOf(s: string, max = 80): string {
@@ -169,7 +172,9 @@ function expandTurns(
   const out: TurnView[] = [];
   let i = 0;
   conv.forEach((t, convIdx) => {
-    const bubbleId = convIdx === respIndex ? "resp" : `msg:${convIdx}`;
+    const bubbleId =
+      t.focus ?? (convIdx === respIndex ? "resp" : `msg:${convIdx}`);
+    const nest = { agentId: t.agent_id, parentToolCallId: t.parent_tool_call_id };
 
     // Reasoning (chain-of-thought / thinking summary) — emitted as its own
     // node ahead of the assistant content/tool_calls when present.
@@ -182,6 +187,7 @@ function expandTurns(
         body: t.reasoning,
         eventId: t.event_id,
         focusTarget: bubbleId,
+        ...nest,
       });
     }
 
@@ -195,6 +201,7 @@ function expandTurns(
           body: t.content,
           eventId: t.event_id,
           focusTarget: bubbleId,
+          ...nest,
         });
       }
       for (const tc of t.tool_calls) {
@@ -210,6 +217,8 @@ function expandTurns(
           body: `${tc.name}(${args})`,
           eventId: t.event_id,
           focusTarget: tc.id ? `tc:${tc.id}` : bubbleId,
+          toolCallId: tc.id,
+          ...nest,
         });
       }
       return;
@@ -236,6 +245,7 @@ function expandTurns(
       body: t.content,
       eventId: t.event_id,
       focusTarget: bubbleId,
+      ...nest,
     });
   });
   return out;
@@ -271,10 +281,23 @@ function buildGraph(
   });
 
   const edges: Edge[] = [];
-  for (let i = 1; i < turns.length; i++) {
+  const lastByAgent = new Map<string, number>();
+  const toolNode = new Map<string, number>();
+  for (let i = 0; i < turns.length; i++) {
+    const t = turns[i];
+    const agent = t.agentId ?? "";
+    let prev = lastByAgent.get(agent);
+    if (prev === undefined && agent !== "") {
+      prev =
+        (t.parentToolCallId ? toolNode.get(t.parentToolCallId) : undefined) ??
+        (i > 0 ? i - 1 : undefined);
+    }
+    lastByAgent.set(agent, i);
+    if (t.toolCallId) toolNode.set(t.toolCallId, i);
+    if (prev === undefined) continue;
     edges.push({
-      id: `e:${i - 1}-${i}`,
-      source: `t:${i - 1}`,
+      id: `e:${prev}-${i}`,
+      source: `t:${prev}`,
       target: `t:${i}`,
       type: "smoothstep",
       style: { stroke: edgeColor, strokeWidth: 1.5 },

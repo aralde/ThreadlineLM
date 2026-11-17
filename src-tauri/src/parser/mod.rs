@@ -1,3 +1,4 @@
+pub mod claude_code;
 pub mod detect;
 pub mod litellm;
 pub mod openai_audit;
@@ -16,6 +17,7 @@ pub fn parse(name: &str, content: &str) -> ParseOutcome {
     let compact = compact_pretty_json(content);
     let content = compact.as_deref().unwrap_or(content);
     match detect::detect(name, content) {
+        detect::Format::ClaudeCode => claude_code::parse(content),
         detect::Format::OperatorLm => openai_audit::parse(content),
         detect::Format::OtelGenAi => otel_genai::parse(content),
         detect::Format::LiteLLM => litellm::parse(content),
@@ -173,6 +175,14 @@ mod tests {
     fn example_otel_otlp_pretty() {
         let out = assert_example("otel-genai-otlp-pretty.json", Format::OtelGenAi, 2);
         assert_eq!(out.events[1].endpoint, "/v1/embeddings");
+    }
+
+    #[test]
+    fn example_claude_code_session() {
+        let out = assert_example("claude-code-session.jsonl", Format::ClaudeCode, 2);
+        let calls = out.events[0].response.assistant.as_ref().and_then(|m| m.tool_calls.as_ref());
+        assert_eq!(calls.map(|c| c[0].name.as_str()), Some("Read"));
+        assert_eq!(out.events[1].request.messages[0].role, "tool");
     }
 
     #[test]

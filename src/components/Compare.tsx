@@ -1,3 +1,4 @@
+import { isTranscript } from "../lib/transcript";
 import { useMemo } from "react";
 import DiffMatchPatch from "diff-match-patch";
 import { useStore } from "../state/store";
@@ -7,7 +8,7 @@ const dmp = new DiffMatchPatch();
 
 function eventToText(e: LogEvent) {
   const parts: string[] = [];
-  parts.push(`# ${e.provider}/${e.model}  status=${e.status}  ${e.duration_ms}ms`);
+  parts.push(`# ${e.provider}/${e.model}  ${isTranscript(e) ? "status/latency n/a" : `status=${e.status}  ${e.duration_ms}ms`}`);
   parts.push("");
   parts.push("## REQUEST");
   for (const m of e.request.messages) {

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useStore } from "../state/store";
+import { isTranscript } from "../lib/transcript";
 
 function pct(arr: number[], p: number) {
   if (!arr.length) return 0;
@@ -29,7 +30,7 @@ export default function Metrics() {
   const events = useStore((s) => s.events);
 
   const stats = useMemo(() => {
-    const durations = events.map((e) => e.duration_ms);
+    const durations = events.filter((e) => !isTranscript(e)).map((e) => e.duration_ms);
     let promptTok = 0,
       completionTok = 0,
       cost = 0,
@@ -63,6 +64,7 @@ export default function Metrics() {
       p95: pct(durations, 95),
       p99: pct(durations, 99),
       max: Math.max(0, ...durations),
+      hasLatency: durations.length > 0,
       promptTok,
       completionTok,
       withTokens,
@@ -86,7 +88,7 @@ export default function Metrics() {
     <div className="p-4 space-y-4 overflow-auto h-full">
       <div className="grid grid-cols-4 gap-3">
         <Stat label="Requests" value={String(stats.total)} sub={`${stats.errors} errors`} />
-        <Stat label="Latency p50 / p95" value={`${stats.p50} / ${stats.p95} ms`} sub={`p99 ${stats.p99} ms · max ${stats.max} ms`} />
+        <Stat label="Latency p50 / p95" value={stats.hasLatency ? `${stats.p50} / ${stats.p95} ms` : "—"} sub={stats.hasLatency ? `p99 ${stats.p99} ms · max ${stats.max} ms` : "not recorded in transcripts"} />
         <Stat
           label="Tokens (in / out)"
           value={`${stats.promptTok.toLocaleString()} / ${stats.completionTok.toLocaleString()}`}
