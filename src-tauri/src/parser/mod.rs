@@ -1,3 +1,4 @@
+pub mod claude_code;
 pub mod detect;
 pub mod litellm;
 pub mod openai_audit;
@@ -14,6 +15,7 @@ pub struct ParseOutcome {
 
 pub fn parse(name: &str, content: &str) -> ParseOutcome {
     match detect::detect(name, content) {
+        detect::Format::ClaudeCode => claude_code::parse(content),
         detect::Format::OperatorLm => openai_audit::parse(content),
         detect::Format::OtelGenAi => otel_genai::parse(content),
         detect::Format::LiteLLM => litellm::parse(content),
@@ -115,6 +117,14 @@ mod tests {
         let streamed = out.events[1].response.assistant.as_ref().unwrap();
         assert_eq!(streamed.content.as_deref(), Some("Bonjour le monde."));
         assert_eq!(out.events[4].status, 500);
+    }
+
+    #[test]
+    fn example_claude_code_session() {
+        let out = assert_example("claude-code-session.jsonl", Format::ClaudeCode, 2);
+        let calls = out.events[0].response.assistant.as_ref().and_then(|m| m.tool_calls.as_ref());
+        assert_eq!(calls.map(|c| c[0].name.as_str()), Some("Read"));
+        assert_eq!(out.events[1].request.messages[0].role, "tool");
     }
 
     #[test]

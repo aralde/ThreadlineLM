@@ -83,6 +83,9 @@ export interface ConversationTurn {
   content: string;
   tool_calls?: ToolCall[];
   reasoning?: string | null;
+  focus?: string;
+  agent_id?: string;
+  parent_tool_call_id?: string;
 }
 
 export interface Session {

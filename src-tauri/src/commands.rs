@@ -12,14 +12,35 @@ use crate::session;
 use crate::store::AppStore;
 
 fn build_load_result(name: &str, path: &str, content: &str) -> LoadResult {
-    let outcome = parser::parse(name, content);
-    let sessions = session::group(&outcome.events);
-    let files = vec![SourceFile {
+    let mut outcome = parser::parse(name, content);
+    let mut files = vec![SourceFile {
         path: path.to_string(),
         name: name.to_string(),
         bytes: content.len() as u64,
         events: outcome.events.len() as u32,
     }];
+
+    if path != name && outcome.events.iter().any(parser::claude_code::is_transcript_event) {
+        for sub in parser::claude_code::companion_paths(Path::new(path)) {
+            let Ok(text) = fs::read_to_string(&sub) else { continue };
+            let sub_name = sub
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default()
+                .to_string();
+            let sub_out = parser::claude_code::parse(&text);
+            files.push(SourceFile {
+                path: sub.to_string_lossy().into_owned(),
+                name: sub_name,
+                bytes: text.len() as u64,
+                events: sub_out.events.len() as u32,
+            });
+            outcome.events.extend(sub_out.events);
+            outcome.warnings.extend(sub_out.warnings);
+        }
+    }
+
+    let sessions = session::group(&outcome.events);
     LoadResult {
         workspace: Workspace {
             files,

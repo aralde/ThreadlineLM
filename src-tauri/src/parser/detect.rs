@@ -1,4 +1,6 @@
 pub enum Format {
+    /// Claude Code session transcript (`~/.claude/projects/**/*.jsonl`).
+    ClaudeCode,
     /// operatorlm audit envelope: `{id, ts, req_body, resp_body, ...}` either
     /// as JSONL or as a JSON array.
     OperatorLm,
@@ -31,13 +33,18 @@ pub fn detect(_name: &str, content: &str) -> Format {
         // Keep sniffing past unmarked lines: OTel exports usually open with a
         // root span (e.g. `agent.run`) that carries no gen_ai.* attributes.
         let mut saw_object = false;
-        for line in content.lines().take(8) {
+        for line in content.lines().take(32) {
             let l = line.trim();
             if l.is_empty() {
                 continue;
             }
             if !(l.starts_with('{') && l.ends_with('}')) {
                 break;
+            }
+            if serde_json::from_str::<serde_json::Value>(l)
+                .map_or(false, |v| super::claude_code::looks_like_entry(&v))
+            {
+                return Format::ClaudeCode;
             }
             if let Some(f) = sniff_known_object(l) {
                 return f;
@@ -142,6 +149,14 @@ mod tests {
     fn detects_litellm() {
         let line = r#"{"id":"x","call_type":"completion","custom_llm_provider":"openai","model":"gpt-4","messages":[]}"#;
         assert!(matches!(detect("litellm.jsonl", line), Format::LiteLLM));
+    }
+
+    #[test]
+    fn detects_claude_code_transcript() {
+        let snap = r#"{"type":"file-history-snapshot","messageId":"m","snapshot":{}}"#;
+        let line = r#"{"parentUuid":null,"sessionId":"s","uuid":"u","type":"user","message":{"role":"user","content":"mentions \"gen_ai.system\""}}"#;
+        let s = format!("{snap}\n{line}\n");
+        assert!(matches!(detect("s.jsonl", &s), Format::ClaudeCode));
     }
 
     #[test]
