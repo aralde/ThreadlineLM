@@ -13,12 +13,30 @@ pub struct ParseOutcome {
 }
 
 pub fn parse(name: &str, content: &str) -> ParseOutcome {
+    let compact = compact_pretty_json(content);
+    let content = compact.as_deref().unwrap_or(content);
     match detect::detect(name, content) {
         detect::Format::OperatorLm => openai_audit::parse(content),
         detect::Format::OtelGenAi => otel_genai::parse(content),
         detect::Format::LiteLLM => litellm::parse(content),
         detect::Format::RawText => raw_text::parse(content),
     }
+}
+
+/// A pretty-printed JSON object spans several lines, so line sniffing and
+/// per-line parsing both fail on it. When the first line is not a complete
+/// JSON value but the whole file is one, return it re-serialized on one line.
+fn compact_pretty_json(content: &str) -> Option<String> {
+    let trimmed = content.trim();
+    if !trimmed.starts_with('{') {
+        return None;
+    }
+    let first_line = trimmed.lines().next()?;
+    if serde_json::from_str::<serde_json::Value>(first_line).is_ok() {
+        return None;
+    }
+    let value = serde_json::from_str::<serde_json::Value>(trimmed).ok()?;
+    serde_json::to_string(&value).ok()
 }
 
 /// Dispatch a top-level JSON value: pass each object to `f`, accumulating
@@ -75,7 +93,7 @@ mod tests {
 
     fn assert_example(name: &str, expected: Format, events: usize) -> super::ParseOutcome {
         let content = load(name);
-        let format = detect(name, &content);
+        let format = detect(name, super::compact_pretty_json(&content).as_deref().unwrap_or(&content));
         assert!(
             std::mem::discriminant(&format) == std::mem::discriminant(&expected),
             "{name}: unexpected format"
@@ -115,6 +133,46 @@ mod tests {
         let streamed = out.events[1].response.assistant.as_ref().unwrap();
         assert_eq!(streamed.content.as_deref(), Some("Bonjour le monde."));
         assert_eq!(out.events[4].status, 500);
+    }
+
+    #[test]
+    fn example_audit_pretty() {
+        let out = assert_example("audit-pretty.json", Format::OperatorLm, 1);
+        assert_eq!(out.events[0].status, 200);
+    }
+
+    #[test]
+    fn example_audit_array_pretty() {
+        assert_example("audit-array-pretty.json", Format::OperatorLm, 2);
+    }
+
+    #[test]
+    fn example_litellm_pretty() {
+        let out = assert_example("litellm-pretty.json", Format::LiteLLM, 1);
+        let reply = out.events[0].response.assistant.as_ref().unwrap();
+        assert_eq!(reply.content.as_deref(), Some("Seeing Inside Your Agents"));
+    }
+
+    #[test]
+    fn example_litellm_array_pretty() {
+        assert_example("litellm-array-pretty.json", Format::LiteLLM, 2);
+    }
+
+    #[test]
+    fn example_otel_span_pretty() {
+        let out = assert_example("otel-genai-span-pretty.json", Format::OtelGenAi, 1);
+        assert!(matches!(out.events[0].provider, Provider::OpenAI));
+    }
+
+    #[test]
+    fn example_otel_spans_array_pretty() {
+        assert_example("otel-genai-spans-pretty.json", Format::OtelGenAi, 2);
+    }
+
+    #[test]
+    fn example_otel_otlp_pretty() {
+        let out = assert_example("otel-genai-otlp-pretty.json", Format::OtelGenAi, 2);
+        assert_eq!(out.events[1].endpoint, "/v1/embeddings");
     }
 
     #[test]
