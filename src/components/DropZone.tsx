@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Upload, Eye, Clock, Play, Trash2, FileText } from "lucide-react";
 import { ipc } from "../ipc";
 import { useStore } from "../state/store";
 import { open } from "@tauri-apps/plugin-dialog";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 export default function DropZone({ fullscreen = false }: { fullscreen?: boolean }) {
   const [dragOver, setDragOver] = useState(false);
@@ -10,7 +11,6 @@ export default function DropZone({ fullscreen = false }: { fullscreen?: boolean 
   const [error, setError] = useState<string | null>(null);
 
   const setWorkspace = useStore((s) => s.setWorkspace);
-  const mergeWorkspace = useStore((s) => s.mergeWorkspace);
   const hasEvents = useStore((s) => s.events.length > 0);
   const startWatch = useStore((s) => s.startWatch);
   const recentFiles = useStore((s) => s.recentFiles);
@@ -70,9 +70,8 @@ export default function DropZone({ fullscreen = false }: { fullscreen?: boolean 
         for (let i = 0; i < arr.length; i++) {
           const f = arr[i];
           const text = await f.text();
-          const res = await ipc.loadText(f.name, text);
-          if (i === 0 && !hasEvents) setWorkspace(res.workspace, res.warnings);
-          else mergeWorkspace(res.workspace, res.warnings);
+          const res = await ipc.loadText(f.name, text, hasEvents || i > 0);
+          setWorkspace(res.workspace, res.warnings);
         }
       } catch (e) {
         setError(String(e));
@@ -80,14 +79,49 @@ export default function DropZone({ fullscreen = false }: { fullscreen?: boolean 
         setBusy(false);
       }
     },
-    [hasEvents, setWorkspace, mergeWorkspace]
+    [hasEvents, setWorkspace]
   );
 
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
-  };
+  const handlePaths = useCallback(
+    async (paths: string[]) => {
+      setBusy(true);
+      setError(null);
+      try {
+        for (let i = 0; i < paths.length; i++) {
+          const res = await ipc.loadFile(paths[i], hasEvents || i > 0);
+          setWorkspace(res.workspace, res.warnings);
+        }
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [hasEvents, setWorkspace]
+  );
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        const p = event.payload;
+        if (p.type === "enter" || p.type === "over") setDragOver(true);
+        else if (p.type === "leave") setDragOver(false);
+        else if (p.type === "drop") {
+          setDragOver(false);
+          if (p.paths.length) handlePaths(p.paths);
+        }
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [handlePaths]);
 
   const onPick = () => {
     const input = document.createElement("input");
@@ -108,12 +142,6 @@ export default function DropZone({ fullscreen = false }: { fullscreen?: boolean 
     <div className={cls}>
       <div className={fullscreen ? "max-w-xl w-full flex flex-col gap-6" : ""}>
         <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
           onClick={onPick}
           className={`cursor-pointer select-none rounded-lg border-2 border-dashed transition px-10 py-12 text-center w-full ${
             dragOver
