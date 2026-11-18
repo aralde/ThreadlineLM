@@ -50,7 +50,7 @@ export default function RecentFilesView() {
         multiple: false,
         filters: [{
           name: "Log Files",
-          extensions: ["log", "jsonl", "json", "txt", "ndjson"]
+          extensions: ["log", "jsonl", "json", "txt", "ndjson", "gz"]
         }]
       });
       if (selected && typeof selected === "string") {

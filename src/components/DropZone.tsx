@@ -5,6 +5,15 @@ import { useStore } from "../state/store";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
+async function readDroppedFile(f: File): Promise<{ name: string; text: string }> {
+  const head = new Uint8Array(await f.slice(0, 2).arrayBuffer());
+  const isGzip = head[0] === 0x1f && head[1] === 0x8b;
+  if (!isGzip) return { name: f.name, text: await f.text() };
+  const stream = f.stream().pipeThrough(new DecompressionStream("gzip"));
+  const text = await new Response(stream).text();
+  return { name: f.name.replace(/\.gz$/i, ""), text };
+}
+
 export default function DropZone({ fullscreen = false }: { fullscreen?: boolean }) {
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -46,7 +55,7 @@ export default function DropZone({ fullscreen = false }: { fullscreen?: boolean 
         multiple: false,
         filters: [{
           name: "Log Files",
-          extensions: ["log", "jsonl", "json", "txt", "ndjson"]
+          extensions: ["log", "jsonl", "json", "txt", "ndjson", "gz"]
         }]
       });
       if (selected && typeof selected === "string") {
@@ -69,8 +78,8 @@ export default function DropZone({ fullscreen = false }: { fullscreen?: boolean 
         const arr = Array.from(files);
         for (let i = 0; i < arr.length; i++) {
           const f = arr[i];
-          const text = await f.text();
-          const res = await ipc.loadText(f.name, text, hasEvents || i > 0);
+          const { name, text } = await readDroppedFile(f);
+          const res = await ipc.loadText(name, text, hasEvents || i > 0);
           setWorkspace(res.workspace, res.warnings);
         }
       } catch (e) {
@@ -127,7 +136,7 @@ export default function DropZone({ fullscreen = false }: { fullscreen?: boolean 
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = ".log,.jsonl,.json,.txt,.ndjson";
+    input.accept = ".log,.jsonl,.json,.txt,.ndjson,.gz";
     input.onchange = () => {
       if (input.files) handleFiles(input.files);
     };

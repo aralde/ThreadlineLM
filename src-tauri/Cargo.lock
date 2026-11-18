@@ -3322,6 +3322,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "flate2",
  "hex",
  "once_cell",
  "regex",
