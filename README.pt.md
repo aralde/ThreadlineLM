@@ -23,7 +23,7 @@
 
 Quando a execução de um agente dá errado, a evidência está num log cheio de JSON: requisições, respostas, chamadas de ferramentas, chunks de streaming, novas tentativas. O ThreadlineLM é um app desktop que transforma esse arquivo numa timeline legível, na conversa reconstruída de cada sessão e num grafo de cada chamada de ferramenta. Arraste o arquivo para a janela. Nada sai da sua máquina.
 
-Lê **logs de auditoria compatíveis com OpenAI**, **spans GenAI do OpenTelemetry** e logs do **LiteLLM**. O formato é detectado pelo conteúdo, então a extensão do arquivo não importa.
+Lê **logs de auditoria compatíveis com OpenAI**, **spans GenAI do OpenTelemetry**, logs do **LiteLLM** e **transcrições de sessões do Claude Code**. O formato é detectado pelo conteúdo, então a extensão do arquivo não importa.
 
 Se ele te poupar uma sessão de debugging, uma ⭐ ajuda outras pessoas a encontrá-lo.
 
@@ -70,7 +70,7 @@ Atalhos: `Ctrl+1..5` alterna entre Timeline, Detail, Graph, Compare e Metrics.
 
 ## Formatos suportados
 
-`inputExample/` tem um arquivo sintético por formato, então cada parser pode ser testado sem traces reais:
+`inputExample/` tem arquivos sintéticos de exemplo para cada formato (incluindo variantes formatadas com pretty-print), então cada parser pode ser testado sem traces reais:
 
 | Formato | Arquivo de exemplo | Eventos |
 |---|---|---|
@@ -79,16 +79,17 @@ Atalhos: `Ctrl+1..5` alterna entre Timeline, Detail, Graph, Compare e Metrics.
 | Spans GenAI do OpenTelemetry, atributos simples, um por linha (spans que não são GenAI são ignorados) | `otel-genai-spans.jsonl` | 3 |
 | Envelope de exportação OTLP/JSON (`resourceSpans`) com atributos KeyValue | `otel-genai-otlp.json` | 2 |
 | `StandardLoggingPayload` do LiteLLM: resposta em streaming, uso de ferramentas, embedding, falha | `litellm.jsonl` | 5 |
+| Transcrição de sessão do Claude Code; subagentes em `<session>/subagents/*.jsonl` são carregados automaticamente | `claude-code-session.jsonl` | 2 |
 | Log de proxy em texto puro com JSON de auditoria embutido em algumas linhas | `proxy-raw.log` | 2 |
 
-Limitação: o JSON precisa ter um registro por linha (ou ser um envelope OTLP numa única linha). JSON formatado em várias linhas ainda não é detectado.
+JSON formatado em várias linhas (um único objeto ou um array) abre como qualquer outro arquivo (veja `inputExample/*-pretty.json`).
 
 ## Como funciona
 
 ```mermaid
 graph LR
     A[".log / .jsonl / .json"] --> B["detect format<br/>(Rust)"]
-    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · raw text"]
+    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · Claude Code · raw text"]
     C --> D["sessions<br/>client + 10-min window"]
     D --> E["React UI<br/>Timeline · Detail · Graph · Compare · Metrics"]
 ```
@@ -105,7 +106,7 @@ src-tauri/src/
   session.rs               grouping by client + 10-min window
   export.rs                session_to_markdown
   commands.rs              #[tauri::command] exposed to the frontend
-inputExample/              one synthetic example per supported format
+inputExample/              exemplos sintéticos para cada formato suportado
 ```
 
 ## Testes
@@ -159,14 +160,14 @@ Distribua **a pasta inteira**, não só o `.exe`, porque o WebView2 fica ao lado
 Compilar para Windows, macOS e Linux a partir de uma única máquina exige o toolchain nativo de cada destino, então os releases são compilados no CI. Um push de uma tag `v*` dispara [`.github/workflows/release.yml`](.github/workflows/release.yml), que compila em `windows-latest`, `macos-latest` (Apple Silicon e Intel) e `ubuntu-22.04`, e anexa os instaladores e um `.exe` portátil do Windows a um rascunho de GitHub Release para revisão antes da publicação.
 
 ```bash
-git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
+git tag -a v0.4.0 -m "v0.4.0" && git push origin v0.4.0
 ```
 
 </details>
 
 ## Status
 
-Inicial: v0.3.0. Os formatos e as visualizações são estáveis o bastante para o debugging do dia a dia; espere algumas arestas com formatos de log incomuns. Se algum log seu não for detectado, uma issue com uma amostra anonimizada é o relatório de bug mais útil.
+Inicial: v0.4.0. Os formatos e as visualizações são estáveis o bastante para o debugging do dia a dia; espere algumas arestas com formatos de log incomuns. Se algum log seu não for detectado, uma issue com uma amostra anonimizada é o relatório de bug mais útil.
 
 ## Contribuindo
 

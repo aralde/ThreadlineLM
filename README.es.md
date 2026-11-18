@@ -23,7 +23,7 @@
 
 Cuando la ejecución de un agente sale mal, la evidencia está en un log lleno de JSON: requests, respuestas, llamadas a herramientas, chunks de streaming, reintentos. ThreadlineLM es una app de escritorio que convierte ese archivo en un timeline legible, la conversación reconstruida de cada sesión y un grafo de cada llamada a herramienta. Arrastra el archivo a la ventana. Nada sale de tu máquina.
 
-Lee **logs de auditoría compatibles con OpenAI**, **spans GenAI de OpenTelemetry** y logs de **LiteLLM**. El formato se detecta por el contenido, así que la extensión del archivo no importa.
+Lee **logs de auditoría compatibles con OpenAI**, **spans GenAI de OpenTelemetry**, logs de **LiteLLM** y **transcripciones de sesiones de Claude Code**. El formato se detecta por el contenido, así que la extensión del archivo no importa.
 
 Si te ahorra una sesión de debugging, una ⭐ ayuda a que otras personas lo encuentren.
 
@@ -70,7 +70,7 @@ Atajos: `Ctrl+1..5` cambia entre Timeline, Detail, Graph, Compare y Metrics.
 
 ## Formatos soportados
 
-`inputExample/` tiene un archivo sintético por formato, así cada parser se puede probar sin trazas reales:
+`inputExample/` tiene archivos sintéticos de ejemplo para cada formato (incluyendo variantes con formato pretty-printed), así cada parser se puede probar sin trazas reales:
 
 | Formato | Archivo de ejemplo | Eventos |
 |---|---|---|
@@ -79,16 +79,17 @@ Atajos: `Ctrl+1..5` cambia entre Timeline, Detail, Graph, Compare y Metrics.
 | Spans GenAI de OpenTelemetry, atributos planos, uno por línea (los spans que no son GenAI se ignoran) | `otel-genai-spans.jsonl` | 3 |
 | Envelope de exportación OTLP/JSON (`resourceSpans`) con atributos KeyValue | `otel-genai-otlp.json` | 2 |
 | `StandardLoggingPayload` de LiteLLM: respuesta en streaming, uso de herramientas, embedding, fallo | `litellm.jsonl` | 5 |
+| Transcripción de sesión de Claude Code; los subagentes en `<session>/subagents/*.jsonl` se cargan automáticamente | `claude-code-session.jsonl` | 2 |
 | Log de proxy en texto plano con JSON de auditoría embebido en algunas líneas | `proxy-raw.log` | 2 |
 
-Limitación: el JSON tiene que tener un registro por línea (o ser un envelope OTLP en una sola línea). El JSON formateado en varias líneas todavía no se detecta.
+El JSON formateado en varias líneas (un solo objeto o un array) se abre como cualquier otro archivo (ver `inputExample/*-pretty.json`).
 
 ## Cómo funciona
 
 ```mermaid
 graph LR
     A[".log / .jsonl / .json"] --> B["detect format<br/>(Rust)"]
-    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · raw text"]
+    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · Claude Code · raw text"]
     C --> D["sessions<br/>client + 10-min window"]
     D --> E["React UI<br/>Timeline · Detail · Graph · Compare · Metrics"]
 ```
@@ -105,7 +106,7 @@ src-tauri/src/
   session.rs               grouping by client + 10-min window
   export.rs                session_to_markdown
   commands.rs              #[tauri::command] exposed to the frontend
-inputExample/              one synthetic example per supported format
+inputExample/              ejemplos sintéticos para cada formato soportado
 ```
 
 ## Tests
@@ -159,14 +160,14 @@ Distribuye **la carpeta completa**, no solo el `.exe`, porque WebView2 va al lad
 Compilar para Windows, macOS y Linux desde una sola máquina requiere el toolchain nativo de cada destino, así que los releases se compilan en CI. Al hacer push de un tag `v*` se dispara [`.github/workflows/release.yml`](.github/workflows/release.yml), que compila en `windows-latest`, `macos-latest` (Apple Silicon e Intel) y `ubuntu-22.04`, y adjunta los instaladores y un `.exe` portable de Windows a un borrador de GitHub Release para revisarlo antes de publicar.
 
 ```bash
-git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
+git tag -a v0.4.0 -m "v0.4.0" && git push origin v0.4.0
 ```
 
 </details>
 
 ## Estado
 
-Temprano: v0.3.0. Los formatos y las vistas son lo bastante estables para el debugging diario; espera algunas asperezas con formas de log poco comunes. Si algún log tuyo no se detecta, un issue con una muestra anonimizada es el reporte de bug más útil.
+Temprano: v0.4.0. Los formatos y las vistas son lo bastante estables para el debugging diario; espera algunas asperezas con formas de log poco comunes. Si algún log tuyo no se detecta, un issue con una muestra anonimizada es el reporte de bug más útil.
 
 ## Contribuir
 

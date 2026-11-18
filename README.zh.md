@@ -23,7 +23,7 @@
 
 当智能体运行出错时，证据就在一份充满 JSON 的日志里：请求、响应、工具调用、流式分块、重试。ThreadlineLM 是一款桌面应用，能把这个文件变成易读的时间线、每个会话重建后的对话，以及每次工具调用的关系图。把文件拖到窗口上即可。任何数据都不会离开你的电脑。
 
-支持读取 **OpenAI 兼容的审计日志**、**OpenTelemetry GenAI span** 和 **LiteLLM** 日志。格式根据文件内容自动识别，因此文件扩展名无关紧要。
+支持读取 **OpenAI 兼容的审计日志**、**OpenTelemetry GenAI span**、**LiteLLM** 日志以及 **Claude Code 会话记录**。格式根据文件内容自动识别，因此文件扩展名无关紧要。
 
 如果它帮你省下了一次调试，点一个 ⭐ 能帮助更多人发现它。
 
@@ -70,7 +70,7 @@ pnpm tauri dev
 
 ## 支持的格式
 
-`inputExample/` 为每种格式提供一个合成示例文件，无需真实追踪数据即可试用每个解析器：
+`inputExample/` 为每种格式提供合成示例文件（包括格式化缩进的 pretty-printed 变体），无需真实追踪数据即可试用每个解析器：
 
 | 格式 | 示例文件 | 事件数 |
 |---|---|---|
@@ -79,16 +79,17 @@ pnpm tauri dev
 | OpenTelemetry GenAI span，普通属性，每行一个（非 GenAI span 会被跳过） | `otel-genai-spans.jsonl` | 3 |
 | 带 KeyValue 属性的 OTLP/JSON 导出信封（`resourceSpans`） | `otel-genai-otlp.json` | 2 |
 | LiteLLM `StandardLoggingPayload`：流式响应、工具使用、embedding、失败 | `litellm.jsonl` | 5 |
+| Claude Code 会话记录；`<session>/subagents/*.jsonl` 中的子智能体会自动加载 | `claude-code-session.jsonl` | 2 |
 | 部分行内嵌审计 JSON 的纯文本代理日志 | `proxy-raw.log` | 2 |
 
-限制：JSON 必须每行一条记录（或是单行的 OTLP 信封）。暂不支持多行格式化（pretty-printed）的 JSON。
+多行格式化（pretty-printed）的 JSON（单个对象或数组）可以像其他文件一样直接打开（参见 `inputExample/*-pretty.json`）。
 
 ## 工作原理
 
 ```mermaid
 graph LR
     A[".log / .jsonl / .json"] --> B["detect format<br/>(Rust)"]
-    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · raw text"]
+    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · Claude Code · raw text"]
     C --> D["sessions<br/>client + 10-min window"]
     D --> E["React UI<br/>Timeline · Detail · Graph · Compare · Metrics"]
 ```
@@ -105,7 +106,7 @@ src-tauri/src/
   session.rs               grouping by client + 10-min window
   export.rs                session_to_markdown
   commands.rs              #[tauri::command] exposed to the frontend
-inputExample/              one synthetic example per supported format
+inputExample/              每种支持格式的合成示例
 ```
 
 ## 测试
@@ -159,14 +160,14 @@ pnpm tauri build
 在一台机器上为 Windows、macOS 和 Linux 交叉构建需要各目标平台的原生工具链，因此发布版本在 CI 上构建。推送 `v*` 标签会触发 [`.github/workflows/release.yml`](.github/workflows/release.yml)，它在 `windows-latest`、`macos-latest`（Apple Silicon 和 Intel）以及 `ubuntu-22.04` 上构建，然后把安装包和一个 Windows 便携版 `.exe` 附加到 GitHub Release 草稿中，审核后再发布。
 
 ```bash
-git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
+git tag -a v0.4.0 -m "v0.4.0" && git push origin v0.4.0
 ```
 
 </details>
 
 ## 状态
 
-早期版本：v0.3.0。格式和视图已足够稳定，可用于日常调试；遇到不常见的日志形态时可能还有些粗糙。如果你的日志无法被识别，附上一份脱敏样本的 issue 是最有用的 bug 报告。
+早期版本：v0.4.0。格式和视图已足够稳定，可用于日常调试；遇到不常见的日志形态时可能还有些粗糙。如果你的日志无法被识别，附上一份脱敏样本的 issue 是最有用的 bug 报告。
 
 ## 参与贡献
 
