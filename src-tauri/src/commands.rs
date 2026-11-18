@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 use std::thread;
 use std::time::Duration;
@@ -95,18 +96,46 @@ fn load_into_state(
     result
 }
 
+const GZIP_MAGIC: [u8; 2] = [0x1f, 0x8b];
+
+fn decode_source(path: &str, bytes: Vec<u8>) -> std::io::Result<(String, String)> {
+    let file_name = Path::new(path)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(path);
+    let has_gz_ext = file_name.to_ascii_lowercase().ends_with(".gz");
+    if !bytes.starts_with(&GZIP_MAGIC) {
+        if has_gz_ext {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "not a gzip file",
+            ));
+        }
+        let text = String::from_utf8(bytes)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        return Ok((file_name.to_string(), text));
+    }
+    let mut text = String::new();
+    flate2::read::MultiGzDecoder::new(bytes.as_slice()).read_to_string(&mut text)?;
+    let name = if has_gz_ext && file_name.len() > 3 {
+        &file_name[..file_name.len() - 3]
+    } else {
+        file_name
+    };
+    Ok((name.to_string(), text))
+}
+
+fn read_source(path: &str) -> std::io::Result<(String, String)> {
+    decode_source(path, fs::read(path)?)
+}
+
 #[tauri::command]
 pub fn load_file(
     path: String,
     merge: Option<bool>,
     state: State<'_, AppStore>,
 ) -> Result<LoadResult, String> {
-    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let name = Path::new(&path)
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or(&path)
-        .to_string();
+    let (name, content) = read_source(&path).map_err(|e| e.to_string())?;
     Ok(load_into_state(&state, &name, &path, &content, merge.unwrap_or(false)))
 }
 
@@ -141,12 +170,7 @@ pub fn start_watch(
     state: State<'_, AppStore>,
     window: tauri::Window,
 ) -> Result<LoadResult, String> {
-    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let name = Path::new(&path)
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or(&path)
-        .to_string();
+    let (name, content) = read_source(&path).map_err(|e| e.to_string())?;
     let result = build_load_result(&name, &path, &content, &Workspace::default());
 
     {
@@ -187,12 +211,7 @@ pub fn start_watch(
                     last_modified = modified;
                     last_size = size;
 
-                    if let Ok(new_content) = fs::read_to_string(&path_clone) {
-                        let f_name = Path::new(&path_clone)
-                            .file_name()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or(&path_clone)
-                            .to_string();
+                    if let Ok((f_name, new_content)) = read_source(&path_clone) {
                         let load_res = build_load_result(&f_name, &path_clone, &new_content, &Workspace::default());
 
                         {
@@ -304,5 +323,51 @@ mod tests {
         assert_eq!(ws.files.len(), 2);
         assert_eq!(ws.events.len(), 3);
         fs::remove_dir_all(&dir).ok();
+    }
+
+    fn gzip(data: &[u8]) -> Vec<u8> {
+        use std::io::Write;
+        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        enc.write_all(data).unwrap();
+        enc.finish().unwrap()
+    }
+
+    #[test]
+    fn gzip_source_is_decompressed_and_renamed() {
+        let (name, text) = decode_source("/var/log/audit.log.gz", gzip(b"hello\n")).unwrap();
+        assert_eq!(name, "audit.log");
+        assert_eq!(text, "hello\n");
+    }
+
+    #[test]
+    fn gzip_detected_by_magic_without_extension() {
+        let (name, text) = decode_source("/tmp/audit.log.1", gzip(b"x")).unwrap();
+        assert_eq!(name, "audit.log.1");
+        assert_eq!(text, "x");
+    }
+
+    #[test]
+    fn concatenated_gzip_members_are_read() {
+        let mut bytes = gzip(b"a\n");
+        bytes.extend(gzip(b"b\n"));
+        let (_, text) = decode_source("x.gz", bytes).unwrap();
+        assert_eq!(text, "a\nb\n");
+    }
+
+    #[test]
+    fn plain_text_passes_through() {
+        let (name, text) = decode_source("a.jsonl", b"{}".to_vec()).unwrap();
+        assert_eq!((name.as_str(), text.as_str()), ("a.jsonl", "{}"));
+        assert!(decode_source("a.gz", b"{}".to_vec()).is_err());
+    }
+
+    #[test]
+    fn gzip_audit_log_parses() {
+        let raw = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../inputExample/audit.log")).unwrap();
+        let (name, text) = decode_source("audit.log.gz", gzip(raw.as_bytes())).unwrap();
+        let r = build_load_result(&name, "audit.log.gz", &text, &Workspace::default());
+        assert_eq!(r.workspace.files[0].name, "audit.log");
+        assert_eq!(r.workspace.events.len(), parser::parse("audit.log", &raw).events.len());
+        assert!(!r.workspace.events.is_empty());
     }
 }

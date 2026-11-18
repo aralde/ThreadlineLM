@@ -83,11 +83,13 @@ Shortcuts: `Ctrl+1..5` switches between Timeline, Detail, Graph, Compare and Met
 
 Pretty-printed multi-line JSON (a single object or an array) opens like any other file.
 
+Gzip-compressed files (rotated logs such as `audit.log.gz` or `audit.log.1`) are decompressed in memory and then detected like any other file; the sidebar shows the name without `.gz`.
+
 ## How it works
 
 ```mermaid
 graph LR
-    A[".log / .jsonl / .json"] --> B["detect format<br/>(Rust)"]
+    A[".log / .jsonl / .json / .gz"] --> B["detect format<br/>(Rust)"]
     B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · raw text"]
     C --> D["sessions<br/>client + 10-min window"]
     D --> E["React UI<br/>Timeline · Detail · Graph · Compare · Metrics"]
