@@ -23,7 +23,7 @@
 
 When an agent run goes wrong, the evidence is in a log full of JSON: requests, responses, tool calls, streamed chunks, retries. ThreadlineLM is a desktop app that turns that file into a readable timeline, the reconstructed conversation per session, and a graph of every tool call. Drop the file on the window. Nothing leaves your machine.
 
-Reads **OpenAI-compatible audit logs**, **OpenTelemetry GenAI spans** and **LiteLLM** logs. The format is detected from the contents, so the file extension doesn't matter.
+Reads **OpenAI-compatible audit logs**, **OpenTelemetry GenAI spans**, **LiteLLM** logs and **Claude Code session transcripts**. The format is detected from the contents, so the file extension doesn't matter.
 
 If it saves you a debugging session, a ⭐ helps other people find it.
 
@@ -70,7 +70,7 @@ Shortcuts: `Ctrl+1..5` switches between Timeline, Detail, Graph, Compare and Met
 
 ## Supported formats
 
-`inputExample/` holds one synthetic file per format, so every parser can be tried without real traces:
+`inputExample/` holds synthetic sample files for each format (including pretty-printed variants), so every parser can be tried without real traces:
 
 | Format | Example file | Events |
 |---|---|---|
@@ -79,9 +79,10 @@ Shortcuts: `Ctrl+1..5` switches between Timeline, Detail, Graph, Compare and Met
 | OpenTelemetry GenAI spans, plain attributes, one per line (non-GenAI spans are skipped) | `otel-genai-spans.jsonl` | 3 |
 | OTLP/JSON export envelope (`resourceSpans`) with KeyValue attributes | `otel-genai-otlp.json` | 2 |
 | LiteLLM `StandardLoggingPayload`: streamed response, tool use, embedding, failure | `litellm.jsonl` | 5 |
+| Claude Code session transcript; subagents in `<session>/subagents/*.jsonl` are loaded automatically | `claude-code-session.jsonl` | 2 |
 | Plain-text proxy log with audit JSON embedded in some lines | `proxy-raw.log` | 2 |
 
-Pretty-printed multi-line JSON (a single object or an array) opens like any other file.
+Pretty-printed multi-line JSON (a single object or an array) opens like any other file (see `inputExample/*-pretty.json`).
 
 Gzip-compressed files (rotated logs such as `audit.log.gz` or `audit.log.1`) are decompressed in memory and then detected like any other file; the sidebar shows the name without `.gz`.
 
@@ -90,7 +91,7 @@ Gzip-compressed files (rotated logs such as `audit.log.gz` or `audit.log.1`) are
 ```mermaid
 graph LR
     A[".log / .jsonl / .json / .gz"] --> B["detect format<br/>(Rust)"]
-    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · raw text"]
+    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · Claude Code · raw text"]
     C --> D["sessions<br/>client + 10-min window"]
     D --> E["React UI<br/>Timeline · Detail · Graph · Compare · Metrics"]
 ```
@@ -107,7 +108,7 @@ src-tauri/src/
   session.rs               grouping by client + 10-min window
   export.rs                session_to_markdown
   commands.rs              #[tauri::command] exposed to the frontend
-inputExample/              one synthetic example per supported format
+inputExample/              synthetic examples for each supported format
 ```
 
 ## Tests
@@ -161,14 +162,14 @@ Ship the **entire folder**, not just the `.exe`, because WebView2 sits next to i
 Cross-building between Windows, macOS and Linux from one host needs each target's native toolchain, so releases are built on CI. Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds on `windows-latest`, `macos-latest` (Apple Silicon and Intel) and `ubuntu-22.04`, then attaches the installers and a portable Windows `.exe` to a draft GitHub Release for review before publishing.
 
 ```bash
-git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
+git tag -a v0.4.0 -m "v0.4.0" && git push origin v0.4.0
 ```
 
 </details>
 
 ## Status
 
-Early: v0.3.0. Formats and views are stable enough for daily debugging; expect rough edges on unusual log shapes. If a log of yours isn't detected, an issue with a redacted sample is the most useful bug report.
+Early: v0.4.0. Formats and views are stable enough for daily debugging; expect rough edges on unusual log shapes. If a log of yours isn't detected, an issue with a redacted sample is the most useful bug report.
 
 ## Contributing
 

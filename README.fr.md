@@ -23,7 +23,7 @@
 
 Quand l'exécution d'un agent tourne mal, les preuves sont dans un log rempli de JSON : requêtes, réponses, appels d'outils, chunks de streaming, nouvelles tentatives. ThreadlineLM est une application de bureau qui transforme ce fichier en une timeline lisible, la conversation reconstruite de chaque session et un graphe de chaque appel d'outil. Déposez le fichier sur la fenêtre. Rien ne quitte votre machine.
 
-Lit les **logs d'audit compatibles OpenAI**, les **spans GenAI d'OpenTelemetry** et les logs **LiteLLM**. Le format est détecté à partir du contenu, l'extension du fichier n'a donc pas d'importance.
+Lit les **logs d'audit compatibles OpenAI**, les **spans GenAI d'OpenTelemetry**, les logs **LiteLLM** et les **transcriptions de sessions Claude Code**. Le format est détecté à partir du contenu, l'extension du fichier n'a donc pas d'importance.
 
 S'il vous fait gagner une session de débogage, une ⭐ aide d'autres personnes à le trouver.
 
@@ -70,7 +70,7 @@ Raccourcis : `Ctrl+1..5` bascule entre Timeline, Detail, Graph, Compare et Metri
 
 ## Formats pris en charge
 
-`inputExample/` contient un fichier synthétique par format, pour que chaque parser puisse être testé sans traces réelles :
+`inputExample/` contient des fichiers synthétiques d'exemple pour chaque format (y compris les variantes indentées « pretty-printed »), pour que chaque parser puisse être testé sans traces réelles :
 
 | Format | Fichier d'exemple | Événements |
 |---|---|---|
@@ -79,16 +79,17 @@ Raccourcis : `Ctrl+1..5` bascule entre Timeline, Detail, Graph, Compare et Metri
 | Spans GenAI d'OpenTelemetry, attributs simples, un par ligne (les spans non GenAI sont ignorés) | `otel-genai-spans.jsonl` | 3 |
 | Enveloppe d'export OTLP/JSON (`resourceSpans`) avec des attributs KeyValue | `otel-genai-otlp.json` | 2 |
 | `StandardLoggingPayload` de LiteLLM : réponse en streaming, utilisation d'outils, embedding, échec | `litellm.jsonl` | 5 |
+| Transcription de session Claude Code ; les sous-agents dans `<session>/subagents/*.jsonl` sont chargés automatiquement | `claude-code-session.jsonl` | 2 |
 | Log de proxy en texte brut avec du JSON d'audit intégré dans certaines lignes | `proxy-raw.log` | 2 |
 
-Limitation : le JSON doit contenir un enregistrement par ligne (ou être une enveloppe OTLP sur une seule ligne). Le JSON indenté sur plusieurs lignes n'est pas encore détecté.
+Le JSON indenté sur plusieurs lignes (un seul objet ou un tableau) s'ouvre comme n'importe quel autre fichier (voir `inputExample/*-pretty.json`).
 
 ## Fonctionnement
 
 ```mermaid
 graph LR
     A[".log / .jsonl / .json"] --> B["detect format<br/>(Rust)"]
-    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · raw text"]
+    B --> C["parsers<br/>audit · OTel GenAI · LiteLLM · Claude Code · raw text"]
     C --> D["sessions<br/>client + 10-min window"]
     D --> E["React UI<br/>Timeline · Detail · Graph · Compare · Metrics"]
 ```
@@ -105,7 +106,7 @@ src-tauri/src/
   session.rs               grouping by client + 10-min window
   export.rs                session_to_markdown
   commands.rs              #[tauri::command] exposed to the frontend
-inputExample/              one synthetic example per supported format
+inputExample/              exemples synthétiques pour chaque format pris en charge
 ```
 
 ## Tests
@@ -159,14 +160,14 @@ Distribuez **le dossier entier**, pas seulement le `.exe`, car WebView2 se trouv
 Compiler pour Windows, macOS et Linux depuis une seule machine demande la toolchain native de chaque cible, donc les releases sont compilées en CI. Pousser un tag `v*` déclenche [`.github/workflows/release.yml`](.github/workflows/release.yml), qui compile sur `windows-latest`, `macos-latest` (Apple Silicon et Intel) et `ubuntu-22.04`, puis attache les installateurs et un `.exe` portable Windows à un brouillon de GitHub Release, à relire avant publication.
 
 ```bash
-git tag -a v0.3.0 -m "v0.3.0" && git push origin v0.3.0
+git tag -a v0.4.0 -m "v0.4.0" && git push origin v0.4.0
 ```
 
 </details>
 
 ## État
 
-Version précoce : v0.3.0. Les formats et les vues sont assez stables pour le débogage au quotidien ; attendez-vous à quelques imperfections avec des formes de log inhabituelles. Si l'un de vos logs n'est pas détecté, une issue avec un échantillon anonymisé est le rapport de bug le plus utile.
+Version précoce : v0.4.0. Les formats et les vues sont assez stables pour le débogage au quotidien ; attendez-vous à quelques imperfections avec des formes de log inhabituelles. Si l'un de vos logs n'est pas détecté, une issue avec un échantillon anonymisé est le rapport de bug le plus utile.
 
 ## Contribuer
 
